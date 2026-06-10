@@ -1,0 +1,69 @@
+#pragma once
+
+#include <Arduino.h>
+#include <TFT_eSPI.h>
+#include <vector>
+
+#include "adsb.h"
+#include "settings.h"
+#include "touch.h"
+
+enum class ScreenId : uint8_t {
+  Radar,
+  AircraftList,
+  Detail,
+  Settings
+};
+
+enum class UIAction : uint8_t {
+  None,
+  ShowRadar,
+  ShowList,
+  ShowSettings,
+  ShowDetail,
+  RangeNext,
+  ToggleTheme,
+  LatPlus,
+  LatMinus,
+  LonPlus,
+  LonMinus,
+  SaveSettings
+};
+
+struct UIEvent {
+  UIAction action = UIAction::None;
+  String aircraftHex;
+};
+
+class DisplayUI {
+ public:
+  void begin(const AppSettings &settings);
+  void showSplash();
+  void drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft, const String &status,
+                 const String &timeText, const String &lastUpdateText, bool force = false);
+  void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force = false);
+  void drawAircraftDetail(const AppSettings &settings, const Aircraft *aircraft, bool force = false);
+  void drawSettings(const AppSettings &settings, bool force = false);
+  UIEvent handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
+                      const std::vector<Aircraft> &aircraft);
+  void invalidate();
+
+ private:
+  TFT_eSPI tft_;
+  bool dirty_ = true;
+  String selectedHex_;
+
+  uint16_t bg(const AppSettings &settings) const;
+  uint16_t fg(const AppSettings &settings) const;
+  uint16_t muted(const AppSettings &settings) const;
+  uint16_t panel(const AppSettings &settings) const;
+  uint16_t accent(const AppSettings &settings) const;
+  uint16_t altitudeColor(int32_t altFt) const;
+
+  void header(const AppSettings &settings, const String &title, const String &rightText);
+  void button(int16_t x, int16_t y, int16_t w, int16_t h, const String &label, uint16_t fill, uint16_t text);
+  void drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, bool selected);
+  void drawBottomNav(const AppSettings &settings, ScreenId active);
+  const Aircraft *findAircraft(const std::vector<Aircraft> &aircraft, const String &hex) const;
+  String hitAircraft(int16_t x, int16_t y, const AppSettings &settings, const std::vector<Aircraft> &aircraft);
+};
