@@ -152,34 +152,62 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
                           const String &alertText, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  tft_.fillScreen(bg(settings));
-  header(settings, Config::APP_NAME, timeText + "  " + batteryStatus);
+  const uint16_t scopeBg = TFT_BLACK;
+  const uint16_t grid = 0x07E0;
+  const uint16_t gridDim = 0x03A0;
+  const uint16_t text = 0xB7FF;
+  const uint16_t dimText = 0x7BEF;
+  const uint16_t airportColor = TFT_MAGENTA;
+  tft_.fillScreen(scopeBg);
 
   const int16_t cx = tft_.width() / 2;
-  const int16_t cy = 170;
-  const int16_t radius = 118;
-  uint16_t grid = settings.nightMode ? 0x03EF : 0x9CF3;
-  tft_.drawCircle(cx, cy, radius, grid);
-  tft_.drawCircle(cx, cy, radius * 2 / 3, grid);
-  tft_.drawCircle(cx, cy, radius / 3, grid);
-  tft_.drawLine(cx - radius, cy, cx + radius, cy, grid);
-  tft_.drawLine(cx, cy - radius, cx, cy + radius, grid);
+  const int16_t cy = 156;
+  const int16_t radius = 112;
 
-  tft_.setTextColor(muted(settings), bg(settings));
-  tft_.setTextFont(2);
+  tft_.drawCircle(cx, cy, radius + 5, 0x39E7);
+  tft_.drawCircle(cx, cy, radius + 2, 0x18E3);
+  for (uint8_t ring = 1; ring <= 4; ++ring) {
+    tft_.drawCircle(cx, cy, radius * ring / 4, gridDim);
+  }
+  tft_.drawCircle(cx, cy, radius, grid);
+
+  for (uint16_t deg = 0; deg < 360; deg += 45) {
+    const float a = deg * PI / 180.0f;
+    const int16_t x = cx + roundf(sinf(a) * radius);
+    const int16_t y = cy - roundf(cosf(a) * radius);
+    tft_.drawLine(cx, cy, x, y, deg % 90 == 0 ? grid : gridDim);
+  }
+
   tft_.setTextDatum(MC_DATUM);
+  tft_.setTextFont(2);
+  tft_.setTextColor(text, scopeBg);
   tft_.drawString("N", cx, cy - radius - 13);
-  tft_.drawString("S", cx, cy + radius + 12);
-  tft_.drawString("W", cx - radius - 12, cy);
-  tft_.drawString("E", cx + radius + 12, cy);
+  tft_.drawString("S", cx, cy + radius + 13);
+  tft_.drawString("W", cx - radius - 14, cy);
+  tft_.drawString("E", cx + radius + 14, cy);
+  tft_.setTextFont(1);
+  tft_.setTextColor(grid, scopeBg);
+  tft_.drawString(String(settings.rangeKm) + " km", cx + radius - 28, cy + 10);
   tft_.setTextDatum(TL_DATUM);
+
+  tft_.setTextFont(1);
+  tft_.setTextColor(text, scopeBg);
+  tft_.drawString("AC " + String(aircraft.size()), 8, 4);
+  tft_.drawString("WiFi " + wifiStatus, 58, 4);
+  tft_.drawString("GPS " + gpsStatus, 150, 4);
+  tft_.setTextDatum(TR_DATUM);
+  tft_.drawString(timeText + "  " + batteryStatus, tft_.width() - 8, 4);
+  tft_.setTextDatum(TL_DATUM);
+  tft_.setTextColor(dimText, scopeBg);
+  tft_.drawString(lastUpdateText, 8, 18);
 
   for (const AirportOverlay &airport : AIRPORTS) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, airport.lat, airport.lon, settings.rangeKm, cx,
                                   cy, radius);
     if (!p.visible) continue;
-    tft_.fillCircle(p.x, p.y, 3, settings.nightMode ? TFT_MAGENTA : TFT_PURPLE);
-    tft_.setTextColor(settings.nightMode ? TFT_MAGENTA : TFT_PURPLE, bg(settings));
+    tft_.fillCircle(p.x, p.y, 3, airportColor);
+    tft_.setTextColor(airportColor, scopeBg);
+    tft_.setTextFont(1);
     tft_.drawString(airport.id, p.x + 5, p.y - 7);
   }
 
@@ -189,7 +217,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
                                      settings.rangeKm, cx, cy, radius);
       RadarPoint p2 = Radar::project(settings.homeLat, settings.homeLon, a.trail[i].lat, a.trail[i].lon,
                                      settings.rangeKm, cx, cy, radius);
-      if (p1.visible && p2.visible) tft_.drawLine(p1.x, p1.y, p2.x, p2.y, muted(settings));
+      if (p1.visible && p2.visible) tft_.drawLine(p1.x, p1.y, p2.x, p2.y, gridDim);
     }
   }
 
@@ -197,38 +225,32 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
     if (!p.visible) continue;
     drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), selectedHex_ == a.hex);
-    if (a.type.length()) {
-      tft_.setTextColor(muted(settings), bg(settings));
-      tft_.drawString(a.type, p.x + 9, p.y + 7);
-    }
+    const int16_t labelX = p.x < cx ? p.x + 10 : p.x - 58;
+    const int16_t labelY = p.y - 16;
+    tft_.setTextFont(1);
+    tft_.setTextColor(altitudeColor(a.altBaro), scopeBg);
+    tft_.drawString(safeFlight(a), labelX, labelY);
+    tft_.drawString(aircraftSubtitle(a), labelX, labelY + 9);
+    tft_.drawString(altText(a.altBaro), labelX, labelY + 18);
   }
 
-  tft_.fillRect(0, 32, tft_.width(), 28, bg(settings));
-  tft_.setTextColor(fg(settings), bg(settings));
-  tft_.setTextFont(2);
-  tft_.drawString("AC: " + String(aircraft.size()), 8, 40);
-  tft_.drawString("WiFi: " + wifiStatus, 78, 40);
-  tft_.drawString("GPS: " + gpsStatus, 220, 40);
-  tft_.drawString(String(settings.rangeKm) + " km", 340, 40);
-  tft_.setTextDatum(TR_DATUM);
-  tft_.drawString(lastUpdateText, tft_.width() - 8, 40);
-  tft_.setTextDatum(TL_DATUM);
-
   if (alertText.length()) {
-    const uint16_t fill = settings.nightMode ? 0xA000 : TFT_RED;
-    tft_.fillRoundRect(10, 62, tft_.width() - 20, 24, 5, fill);
+    const uint16_t fill = 0xA000;
+    tft_.fillRoundRect(54, 28, tft_.width() - 108, 20, 4, fill);
     tft_.setTextColor(TFT_WHITE, fill);
     tft_.setTextDatum(MC_DATUM);
-    tft_.drawString(alertText, tft_.width() / 2, 74);
+    tft_.setTextFont(1);
+    tft_.drawString(alertText, tft_.width() / 2, 38);
     tft_.setTextDatum(TL_DATUM);
   }
 
   if (gpsCompass.length()) {
-    const int16_t compassY = alertText.length() ? 90 : 62;
-    tft_.fillRoundRect(366, compassY, 104, 24, 5, panel(settings));
-    tft_.setTextColor(fg(settings), panel(settings));
+    const int16_t compassY = alertText.length() ? 52 : 28;
+    tft_.fillRoundRect(366, compassY, 104, 20, 4, 0x0841);
+    tft_.setTextColor(text, 0x0841);
     tft_.setTextDatum(MC_DATUM);
-    tft_.drawString(gpsCompass, 418, compassY + 12);
+    tft_.setTextFont(1);
+    tft_.drawString(gpsCompass, 418, compassY + 10);
     tft_.setTextDatum(TL_DATUM);
   }
 
@@ -402,8 +424,8 @@ const Aircraft *DisplayUI::findAircraft(const std::vector<Aircraft> &aircraft, c
 String DisplayUI::hitAircraft(int16_t x, int16_t y, const AppSettings &settings,
                               const std::vector<Aircraft> &aircraft) {
   const int16_t cx = tft_.width() / 2;
-  const int16_t cy = 170;
-  const int16_t radius = 118;
+  const int16_t cy = 156;
+  const int16_t radius = 112;
   for (const Aircraft &a : aircraft) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
     if (!p.visible) continue;

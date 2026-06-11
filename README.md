@@ -59,6 +59,7 @@ The radar header also shows battery voltage from the board's `IO34` ADC sense li
 
 ## Advanced Radar Features
 
+- Radar screen uses a dark circular scope layout with green rings, crosshairs, compass labels, range marker, and stacked aircraft labels.
 - Aircraft trails keep the last 20 positions per aircraft.
 - Airport overlays mark `IND`, `HUF`, and `MQJ` when they are inside the selected radar range.
 - Aircraft type labels are parsed from ADS-B field `t` or `type` when provided by the API.

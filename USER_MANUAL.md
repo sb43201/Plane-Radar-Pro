@@ -57,6 +57,12 @@ When GPS has a fresh fix, the radar automatically uses the GPS latitude and long
 
 ## Advanced Radar Features
 
+Scope-style radar:
+
+- The radar screen uses a dark circular display with green range rings and crosshairs.
+- Compass labels and range text are drawn around the scope.
+- Aircraft labels show flight, aircraft type/category, and altitude next to the icon.
+
 Aircraft trails:
 
 - The radar keeps the last 20 known positions for each aircraft.
