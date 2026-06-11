@@ -43,7 +43,7 @@ class DisplayUI {
   void begin(const AppSettings &settings);
   void showSplash();
   void drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft, const String &wifiStatus,
-                 const String &gpsStatus, const String &batteryStatus, const String &timeText,
+                 const String &gpsStatus, const String &gpsCompass, const String &batteryStatus, const String &timeText,
                  const String &lastUpdateText, const String &alertText, bool force = false);
   void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force = false);
   void drawAircraftDetail(const AppSettings &settings, const Aircraft *aircraft, bool force = false);

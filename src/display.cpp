@@ -147,8 +147,9 @@ void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
 }
 
 void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft,
-                          const String &wifiStatus, const String &gpsStatus, const String &batteryStatus,
-                          const String &timeText, const String &lastUpdateText, const String &alertText, bool force) {
+                          const String &wifiStatus, const String &gpsStatus, const String &gpsCompass,
+                          const String &batteryStatus, const String &timeText, const String &lastUpdateText,
+                          const String &alertText, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
@@ -219,6 +220,15 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     tft_.setTextColor(TFT_WHITE, fill);
     tft_.setTextDatum(MC_DATUM);
     tft_.drawString(alertText, tft_.width() / 2, 74);
+    tft_.setTextDatum(TL_DATUM);
+  }
+
+  if (gpsCompass.length()) {
+    const int16_t compassY = alertText.length() ? 90 : 62;
+    tft_.fillRoundRect(366, compassY, 104, 24, 5, panel(settings));
+    tft_.setTextColor(fg(settings), panel(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.drawString(gpsCompass, 418, compassY + 12);
     tft_.setTextDatum(TL_DATUM);
   }
 

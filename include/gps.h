@@ -11,6 +11,9 @@ class GPSModule {
   bool hasData() const;
   float latitude();
   float longitude();
+  bool hasCourse() const;
+  float courseDeg();
+  float speedKmph();
   uint32_t satellites();
   String statusText();
 

@@ -38,6 +38,18 @@ float GPSModule::longitude() {
   return hasFix() ? gps_.location.lng() : NAN;
 }
 
+bool GPSModule::hasCourse() const {
+  return hasFix() && gps_.course.isValid() && gps_.course.age() <= Config::GPS_FIX_MAX_AGE_MS;
+}
+
+float GPSModule::courseDeg() {
+  return hasCourse() ? gps_.course.deg() : NAN;
+}
+
+float GPSModule::speedKmph() {
+  return hasFix() && gps_.speed.isValid() ? gps_.speed.kmph() : NAN;
+}
+
 uint32_t GPSModule::satellites() {
   return gps_.satellites.isValid() ? gps_.satellites.value() : 0;
 }

@@ -78,6 +78,11 @@ Alerts:
 - Low altitude alert: below `ALERT_LOW_ALT_FT`, default `3000 ft`.
 - Alert thresholds are configured in `include/config.h`.
 
+GPS compass:
+
+- When GPS is present and reports course-over-ground, the radar shows a small compass readout such as `NE 045 deg`.
+- This is a movement-based GPS course, not a magnetic compass, so it may be blank or unstable when the device is stationary.
+
 ## Battery Voltage
 
 Plane Radar Pro reads the board battery voltage sense line on `IO34` and shows it in the radar header as `Bat x.xxV`. The schematic shows BAT+ feeding `BAT_ADC` through a 100k/100k divider, so the ESP32 ADC sees half of the actual battery voltage.
@@ -158,6 +163,7 @@ The radar screen shows:
 - Aircraft count
 - WiFi status
 - GPS status
+- GPS compass/course when available
 - Battery voltage
 - Close or low-altitude alert banner
 - Selected range

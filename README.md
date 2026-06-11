@@ -63,6 +63,7 @@ The radar header also shows battery voltage from the board's `IO34` ADC sense li
 - Airport overlays mark `IND`, `HUF`, and `MQJ` when they are inside the selected radar range.
 - Aircraft type labels are parsed from ADS-B field `t` or `type` when provided by the API.
 - Alert banner shows aircraft within `ALERT_DISTANCE_KM` or below `ALERT_LOW_ALT_FT`.
+- GPS compass shows course-over-ground when the optional GPS has a valid course fix.
 
 ## Calibration
 

@@ -33,6 +33,7 @@ bool wifiPortalSaved = false;
 uint32_t resetWiFiHoldStartMs = 0;
 uint32_t resetWiFiLastTouchMs = 0;
 String gpsStatus = "No GPS";
+String gpsCompassStatus = "";
 String batteryStatus = "Bat --";
 String alertStatus = "";
 RawTouchPoint calibrationPoints[4];
@@ -63,6 +64,13 @@ const Aircraft *selectedAircraft() {
 
 String aircraftName(const Aircraft &a) {
   return a.flight.length() ? a.flight : a.hex;
+}
+
+String compassPoint(float deg) {
+  if (isnan(deg)) return "---";
+  static const char *POINTS[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+  const uint8_t index = (uint8_t)floorf(fmodf(deg + 22.5f, 360.0f) / 45.0f);
+  return POINTS[index];
 }
 
 void configureTimeIfNeeded() {
@@ -221,6 +229,18 @@ void updateGpsPosition() {
     display.invalidate();
     Serial.printf("[gps] status=%s\n", gpsStatus.c_str());
   }
+
+  String newCompass = "";
+  if (gps.hasCourse()) {
+    const float course = gps.courseDeg();
+    newCompass = compassPoint(course) + " " + String(course, 0) + " deg";
+  }
+  if (newCompass != gpsCompassStatus) {
+    gpsCompassStatus = newCompass;
+    display.invalidate();
+    if (gpsCompassStatus.length()) Serial.printf("[gps] compass=%s\n", gpsCompassStatus.c_str());
+  }
+
   if (!gps.hasFix()) return;
 
   const float lat = gps.latitude();
@@ -394,7 +414,7 @@ void drawCurrentScreen(bool force = false) {
   const String timeText = localTimeText();
   switch (currentScreen) {
     case ScreenId::Radar:
-      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, batteryStatus, timeText, lastUpdateText,
+      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, gpsCompassStatus, batteryStatus, timeText, lastUpdateText,
                         alertStatus, force);
       break;
     case ScreenId::AircraftList:
