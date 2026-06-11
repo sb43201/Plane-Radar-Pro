@@ -85,6 +85,9 @@ bool ADSBClient::fetch(float homeLat, float homeLon, uint16_t rangeKm, std::vect
     if (incoming.hex.isEmpty()) continue;
 
     incoming.flight = cleanFlight(obj["flight"] | "");
+    incoming.type = cleanFlight(obj["t"] | "");
+    if (incoming.type.isEmpty()) incoming.type = cleanFlight(obj["type"] | "");
+    incoming.type.toUpperCase();
     incoming.lat = obj["lat"].is<float>() ? obj["lat"].as<float>() : NAN;
     incoming.lon = obj["lon"].is<float>() ? obj["lon"].as<float>() : NAN;
     incoming.altBaro = obj["alt_baro"].is<int>() ? obj["alt_baro"].as<int>() : INT32_MIN;

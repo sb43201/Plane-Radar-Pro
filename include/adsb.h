@@ -14,6 +14,7 @@ struct TrailPoint {
 struct Aircraft {
   String flight;
   String hex;
+  String type;
   float lat = NAN;
   float lon = NAN;
   int32_t altBaro = INT32_MIN;

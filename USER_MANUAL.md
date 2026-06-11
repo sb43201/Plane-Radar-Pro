@@ -55,6 +55,29 @@ The expand input connector exposes `IO35` and `IO39`; both are input-only pins, 
 
 When GPS has a fresh fix, the radar automatically uses the GPS latitude and longitude as the home position. The top bar shows GPS status such as `No GPS`, `No fix`, or `Fix 8 sat`.
 
+## Advanced Radar Features
+
+Aircraft trails:
+
+- The radar keeps the last 20 known positions for each aircraft.
+- Trails are drawn behind the aircraft icon so movement direction is easier to see.
+
+Airport overlays:
+
+- The radar marks nearby airports when they fit inside the selected range.
+- Current overlays: `IND`, `HUF`, and `MQJ`.
+
+Aircraft type:
+
+- Plane Radar Pro parses ADS-B aircraft type from API fields `t` or `type` when available.
+- The aircraft list and detail page show the type, such as `B739`, beside the flight/hex information.
+
+Alerts:
+
+- Close aircraft alert: within `ALERT_DISTANCE_KM`, default `2.0 km`.
+- Low altitude alert: below `ALERT_LOW_ALT_FT`, default `3000 ft`.
+- Alert thresholds are configured in `include/config.h`.
+
 ## Battery Voltage
 
 Plane Radar Pro reads the board battery voltage sense line on `IO34` and shows it in the radar header as `Bat x.xxV`. The schematic shows BAT+ feeding `BAT_ADC` through a 100k/100k divider, so the ESP32 ADC sees half of the actual battery voltage.
@@ -136,10 +159,12 @@ The radar screen shows:
 - WiFi status
 - GPS status
 - Battery voltage
+- Close or low-altitude alert banner
 - Selected range
 - Last update or error status
 - Radar rings
 - Compass labels
+- Airport overlays
 - Aircraft icons rotated by track heading
 - Aircraft trails
 

@@ -57,6 +57,13 @@ If GPS is connected and has a fresh fix, Plane Radar Pro automatically uses the 
 
 The radar header also shows battery voltage from the board's `IO34` ADC sense line. The schematic shows a 100k/100k BAT+ divider, so the firmware multiplies the ADC reading by 2.0. If the displayed voltage does not match a multimeter reading, tune `BATTERY_ADC_DIVIDER` in `include/config.h`.
 
+## Advanced Radar Features
+
+- Aircraft trails keep the last 20 positions per aircraft.
+- Airport overlays mark `IND`, `HUF`, and `MQJ` when they are inside the selected radar range.
+- Aircraft type labels are parsed from ADS-B field `t` or `type` when provided by the API.
+- Alert banner shows aircraft within `ALERT_DISTANCE_KM` or below `ALERT_LOW_ALT_FT`.
+
 ## Calibration
 
 Touch calibration is available on the device: tap `Setup`, then `Cal Touch`, then tap the four crosshairs. Calibration is saved to ESP32 Preferences/NVS.

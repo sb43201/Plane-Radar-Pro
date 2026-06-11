@@ -8,6 +8,7 @@
 #include "config.h"
 #include "display.h"
 #include "gps.h"
+#include "radar.h"
 #include "settings.h"
 #include "touch.h"
 
@@ -33,9 +34,12 @@ uint32_t resetWiFiHoldStartMs = 0;
 uint32_t resetWiFiLastTouchMs = 0;
 String gpsStatus = "No GPS";
 String batteryStatus = "Bat --";
+String alertStatus = "";
 RawTouchPoint calibrationPoints[4];
 uint8_t calibrationStep = 0;
 bool calibrationWaitingForRelease = false;
+
+void updateAircraftAlerts();
 
 void markWifiPortalSaved() {
   wifiPortalSaved = true;
@@ -55,6 +59,10 @@ const Aircraft *selectedAircraft() {
     if (a.hex == selectedHex) return &a;
   }
   return nullptr;
+}
+
+String aircraftName(const Aircraft &a) {
+  return a.flight.length() ? a.flight : a.hex;
 }
 
 void configureTimeIfNeeded() {
@@ -163,10 +171,46 @@ void refreshAdsbIfDue(bool force = false) {
   const bool ok = adsb.fetch(settings.homeLat, settings.homeLon, settings.rangeKm, aircraft);
   if (ok) {
     lastUpdateText = aircraft.empty() ? "No aircraft" : "Updated " + localTimeText();
+    updateAircraftAlerts();
   } else {
     lastUpdateText = adsb.lastError();
   }
   display.invalidate();
+}
+
+void updateAircraftAlerts() {
+  String nearestAlert = "";
+  String altitudeAlert = "";
+  float nearestDistance = Config::ALERT_DISTANCE_KM + 1.0f;
+  int32_t lowestAltitude = INT32_MAX;
+
+  for (const Aircraft &a : aircraft) {
+    if (!isnan(a.lat) && !isnan(a.lon)) {
+      const float distance = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
+      if (distance <= Config::ALERT_DISTANCE_KM && distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestAlert = aircraftName(a) + " " + String(distance, 1) + " km";
+      }
+    }
+
+    if (a.altBaro != INT32_MIN && a.altBaro < Config::ALERT_LOW_ALT_FT && a.altBaro < lowestAltitude) {
+      lowestAltitude = a.altBaro;
+      altitudeAlert = aircraftName(a) + " " + String(a.altBaro) + " ft";
+    }
+  }
+
+  String newAlert = "";
+  if (nearestAlert.length()) {
+    newAlert = "Close: " + nearestAlert;
+  } else if (altitudeAlert.length()) {
+    newAlert = "Low alt: " + altitudeAlert;
+  }
+
+  if (newAlert != alertStatus) {
+    alertStatus = newAlert;
+    display.invalidate();
+    if (alertStatus.length()) Serial.printf("[alert] %s\n", alertStatus.c_str());
+  }
 }
 
 void updateGpsPosition() {
@@ -350,7 +394,8 @@ void drawCurrentScreen(bool force = false) {
   const String timeText = localTimeText();
   switch (currentScreen) {
     case ScreenId::Radar:
-      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, batteryStatus, timeText, lastUpdateText, force);
+      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, batteryStatus, timeText, lastUpdateText,
+                        alertStatus, force);
       break;
     case ScreenId::AircraftList:
       display.drawAircraftList(settings, aircraft, force);

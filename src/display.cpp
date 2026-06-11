@@ -28,6 +28,22 @@ String headingText(float track) {
 String safeFlight(const Aircraft &a) {
   return a.flight.length() ? a.flight : a.hex;
 }
+
+String aircraftSubtitle(const Aircraft &a) {
+  return a.type.length() ? a.type : (a.category.length() ? a.category : String("---"));
+}
+
+struct AirportOverlay {
+  const char *id;
+  float lat;
+  float lon;
+};
+
+constexpr AirportOverlay AIRPORTS[] = {
+    {"IND", 39.7173f, -86.2944f},
+    {"HUF", 39.4515f, -87.3076f},
+    {"MQJ", 39.8435f, -85.8971f},
+};
 }  // namespace
 
 void DisplayUI::begin(const AppSettings &settings) {
@@ -132,7 +148,7 @@ void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
 
 void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft,
                           const String &wifiStatus, const String &gpsStatus, const String &batteryStatus,
-                          const String &timeText, const String &lastUpdateText, bool force) {
+                          const String &timeText, const String &lastUpdateText, const String &alertText, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
@@ -157,6 +173,15 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   tft_.drawString("E", cx + radius + 12, cy);
   tft_.setTextDatum(TL_DATUM);
 
+  for (const AirportOverlay &airport : AIRPORTS) {
+    RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, airport.lat, airport.lon, settings.rangeKm, cx,
+                                  cy, radius);
+    if (!p.visible) continue;
+    tft_.fillCircle(p.x, p.y, 3, settings.nightMode ? TFT_MAGENTA : TFT_PURPLE);
+    tft_.setTextColor(settings.nightMode ? TFT_MAGENTA : TFT_PURPLE, bg(settings));
+    tft_.drawString(airport.id, p.x + 5, p.y - 7);
+  }
+
   for (const Aircraft &a : aircraft) {
     for (uint8_t i = 1; i < a.trailCount; ++i) {
       RadarPoint p1 = Radar::project(settings.homeLat, settings.homeLon, a.trail[i - 1].lat, a.trail[i - 1].lon,
@@ -171,6 +196,10 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
     if (!p.visible) continue;
     drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), selectedHex_ == a.hex);
+    if (a.type.length()) {
+      tft_.setTextColor(muted(settings), bg(settings));
+      tft_.drawString(a.type, p.x + 9, p.y + 7);
+    }
   }
 
   tft_.fillRect(0, 32, tft_.width(), 28, bg(settings));
@@ -183,6 +212,15 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   tft_.setTextDatum(TR_DATUM);
   tft_.drawString(lastUpdateText, tft_.width() - 8, 40);
   tft_.setTextDatum(TL_DATUM);
+
+  if (alertText.length()) {
+    const uint16_t fill = settings.nightMode ? 0xA000 : TFT_RED;
+    tft_.fillRoundRect(10, 62, tft_.width() - 20, 24, 5, fill);
+    tft_.setTextColor(TFT_WHITE, fill);
+    tft_.setTextDatum(MC_DATUM);
+    tft_.drawString(alertText, tft_.width() / 2, 74);
+    tft_.setTextDatum(TL_DATUM);
+  }
 
   drawBottomNav(settings, ScreenId::Radar);
 }
@@ -206,6 +244,9 @@ void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<
     tft_.fillCircle(22, y + 16, 6, altitudeColor(a.altBaro));
     tft_.setTextColor(fg(settings), panel(settings));
     tft_.drawString(safeFlight(a), 38, y + 4);
+    tft_.setTextColor(muted(settings), panel(settings));
+    tft_.drawString(aircraftSubtitle(a), 38, y + 18);
+    tft_.setTextColor(fg(settings), panel(settings));
     const float d = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
     tft_.drawString(String(d, 1) + " km", 150, y + 4);
     tft_.drawString(altText(a.altBaro), 230, y + 4);
@@ -241,12 +282,13 @@ void DisplayUI::drawAircraftDetail(const AppSettings &settings, const Aircraft *
       "Altitude: " + altText(a.altBaro),
       "Ground speed: " + speedText(a.groundSpeed),
       "Track: " + headingText(a.track),
+      "Type: " + aircraftSubtitle(a),
       "Distance: " + String(dist, 1) + " km",
       "Bearing: " + String(bearing, 0) + " deg",
       "Seen: " + (isnan(a.seen) ? String("---") : String(a.seen, 1) + " s"),
       "Category: " + (a.category.length() ? a.category : String("---"))};
 
-  for (uint8_t i = 0; i < 8; ++i) {
+  for (uint8_t i = 0; i < 9; ++i) {
     tft_.fillRoundRect(18 + (i % 2) * 225, 100 + (i / 2) * 36, 210, 28, 5, panel(settings));
     tft_.setTextColor(fg(settings), panel(settings));
     tft_.drawString(rows[i], 26 + (i % 2) * 225, 106 + (i / 2) * 36);
