@@ -33,6 +33,12 @@ String aircraftSubtitle(const Aircraft &a) {
   return a.type.length() ? a.type : (a.category.length() ? a.category : String("---"));
 }
 
+float angleDiff(float a, float b) {
+  float diff = fabsf(a - b);
+  while (diff >= 360.0f) diff -= 360.0f;
+  return diff > 180.0f ? 360.0f - diff : diff;
+}
+
 void drawEdgeMarker(TFT_eSPI &tft, int16_t cx, int16_t cy, int16_t radius, float bearingDeg, float distanceKm,
                     uint16_t bgColor) {
   const float angle = bearingDeg * PI / 180.0f;
@@ -149,8 +155,9 @@ void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
          active == ScreenId::Radar ? accent(settings) : muted(settings), TFT_WHITE);
   button(gap * 2 + w, y + 5, w, 28, "AC", active == ScreenId::AircraftList ? accent(settings) : muted(settings),
          TFT_WHITE);
-  button(gap * 3 + w * 2, y + 5, w, 28, "APT", active == ScreenId::AirportList ? accent(settings) : panel(settings),
-         active == ScreenId::AirportList ? TFT_WHITE : fg(settings));
+  const bool airportActive = active == ScreenId::AirportList || active == ScreenId::AirportDetail;
+  button(gap * 3 + w * 2, y + 5, w, 28, "APT", airportActive ? accent(settings) : panel(settings),
+         airportActive ? TFT_WHITE : fg(settings));
   button(gap * 4 + w * 3, y + 5, w, 28, compact ? "Rng" : "Range", panel(settings), fg(settings));
   button(gap * 5 + w * 4, y + 5, w, 28, compact ? "Set" : "Setup",
          active == ScreenId::Settings ? accent(settings) : muted(settings),
@@ -318,11 +325,12 @@ void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<A
   drawBottomNav(settings, ScreenId::AirportList);
 }
 
-void DisplayUI::drawAirportDetail(const AppSettings &settings, const Airport *airport, bool force) {
+void DisplayUI::drawAirportDetail(const AppSettings &settings, const Airport *airport,
+                                  const std::vector<Aircraft> &aircraft, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
-  header(settings, "Airport Detail", airport ? AirportManager::displayCode(*airport) : "Missing");
+  header(settings, "Airport Hub", airport ? AirportManager::displayCode(*airport) : "Missing");
   if (!airport) {
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.drawString("Airport is no longer loaded.", 18, 72);
@@ -330,21 +338,79 @@ void DisplayUI::drawAirportDetail(const AppSettings &settings, const Airport *ai
     return;
   }
 
+  uint16_t arrivals = 0;
+  uint16_t departures = 0;
+  int nearestIndex[3] = {-1, -1, -1};
+  float nearestDistance[3] = {99999.0f, 99999.0f, 99999.0f};
+
+  for (size_t i = 0; i < aircraft.size(); ++i) {
+    const Aircraft &a = aircraft[i];
+    if (isnan(a.lat) || isnan(a.lon)) continue;
+    const float d = Radar::distanceKm(airport->lat, airport->lon, a.lat, a.lon);
+    if (d <= settings.rangeKm && !isnan(a.track)) {
+      const float toAirport = Radar::bearingDeg(a.lat, a.lon, airport->lat, airport->lon);
+      const float fromAirport = Radar::bearingDeg(airport->lat, airport->lon, a.lat, a.lon);
+      if (angleDiff(a.track, toAirport) <= 55.0f) arrivals++;
+      else if (angleDiff(a.track, fromAirport) <= 55.0f) departures++;
+    }
+
+    for (uint8_t slot = 0; slot < 3; ++slot) {
+      if (d < nearestDistance[slot]) {
+        for (int8_t move = 2; move > slot; --move) {
+          nearestDistance[move] = nearestDistance[move - 1];
+          nearestIndex[move] = nearestIndex[move - 1];
+        }
+        nearestDistance[slot] = d;
+        nearestIndex[slot] = (int)i;
+        break;
+      }
+    }
+  }
+
+  const String code = AirportManager::displayCode(*airport);
+  tft_.setTextDatum(MC_DATUM);
+  tft_.setTextColor(accent(settings), bg(settings));
+  tft_.setTextFont(4);
+  tft_.drawString(code, tft_.width() / 2, 58);
+  tft_.setTextFont(2);
+  tft_.setTextColor(fg(settings), bg(settings));
+  tft_.drawString("Arrivals: " + String(arrivals) + "   Departures: " + String(departures), tft_.width() / 2, 92);
+  tft_.setTextDatum(TL_DATUM);
+
+  button(24, 112, tft_.width() - 48, 30, "Center Radar Here", accent(settings), TFT_WHITE);
+
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(2);
-  tft_.drawString(airport->name, 12, 44);
-  String rows[] = {
-      "Code: " + AirportManager::displayCode(*airport),
-      "Type: " + airport->type,
-      "Distance: " + String(airport->distanceKm, 1) + " km",
-      "Bearing: " + String(airport->bearingDeg, 0) + " deg",
-      "Lat: " + String(airport->lat, 5),
-      "Lon: " + String(airport->lon, 5),
-  };
-  for (uint8_t i = 0; i < 6; ++i) {
-    tft_.fillRoundRect(10, 78 + i * 34, tft_.width() - 20, 28, 5, panel(settings));
+  tft_.drawString("Nearest", 16, 154);
+  for (uint8_t row = 0; row < 3; ++row) {
+    const int16_t y = 178 + row * 34;
+    tft_.fillRoundRect(10, y, tft_.width() - 20, 28, 5, panel(settings));
     tft_.setTextColor(fg(settings), panel(settings));
-    tft_.drawString(rows[i], 18, 84 + i * 34);
+    if (nearestIndex[row] >= 0) {
+      const Aircraft &a = aircraft[nearestIndex[row]];
+      tft_.drawString(safeFlight(a), 18, y + 6);
+      tft_.setTextDatum(TR_DATUM);
+      tft_.drawString(String(nearestDistance[row], 1) + " km", tft_.width() - 18, y + 6);
+      tft_.setTextDatum(TL_DATUM);
+    } else {
+      tft_.setTextColor(muted(settings), panel(settings));
+      tft_.drawString("---", 18, y + 6);
+    }
+  }
+
+  String name = airport->name;
+  if (name.length() > 28) name = name.substring(0, 28);
+  String rows[] = {
+      name,
+      "Type: " + airport->type,
+      "From home: " + String(airport->distanceKm, 1) + " km @ " + String(airport->bearingDeg, 0) + " deg",
+      "Lat/Lon: " + String(airport->lat, 5) + ", " + String(airport->lon, 5),
+  };
+  for (uint8_t i = 0; i < 4; ++i) {
+    const int16_t y = 292 + i * 32;
+    tft_.fillRoundRect(10, y, tft_.width() - 20, 26, 5, panel(settings));
+    tft_.setTextColor(fg(settings), panel(settings));
+    tft_.drawString(rows[i], 18, y + 5);
   }
   drawBottomNav(settings, ScreenId::AirportDetail);
 }
@@ -586,6 +652,13 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     if (event.airportCode.length()) {
       selectedAirportCode_ = event.airportCode;
       event.action = UIAction::ShowAirportDetail;
+      dirty_ = true;
+    }
+  } else if (screen == ScreenId::AirportDetail) {
+    if (inRect(point.x, point.y, 24, 112, tft_.width() - 48, 30) ||
+        inRect(point.x, point.y, 0, 34, tft_.width(), 70)) {
+      event.airportCode = selectedAirportCode_;
+      event.action = UIAction::CenterOnAirport;
       dirty_ = true;
     }
   } else if (screen == ScreenId::Settings) {

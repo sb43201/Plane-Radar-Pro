@@ -46,6 +46,7 @@ String alertStatus = "";
 RawTouchPoint calibrationPoints[4];
 uint8_t calibrationStep = 0;
 bool calibrationWaitingForRelease = false;
+bool airportCenterActive = false;
 
 void updateAircraftAlerts();
 void processGpsLogging();
@@ -336,7 +337,7 @@ void updateGpsPosition() {
     if (gpsCompassStatus.length()) Serial.printf("[gps] compass=%s\n", gpsCompassStatus.c_str());
   }
 
-  if (!gps.hasFix()) return;
+  if (!gps.hasFix() || airportCenterActive) return;
 
   const float lat = gps.latitude();
   const float lon = gps.longitude();
@@ -396,6 +397,23 @@ void handleUiEvent(const UIEvent &event) {
       selectedAirportCode = event.airportCode;
       currentScreen = ScreenId::AirportDetail;
       break;
+    case UIAction::CenterOnAirport: {
+      if (event.airportCode.length()) selectedAirportCode = event.airportCode;
+      const Airport *airport = selectedAirport();
+      if (airport) {
+        const String airportCode = AirportManager::displayCode(*airport);
+        settings.homeLat = airport->lat;
+        settings.homeLon = airport->lon;
+        lastAdsbMs = 0;
+        updateAirports(true);
+        refreshAdsbIfDue(true);
+        airportCenterActive = true;
+        currentScreen = ScreenId::Radar;
+        Serial.printf("[airport] radar centered on %s %.6f, %.6f\n", airportCode.c_str(), settings.homeLat,
+                      settings.homeLon);
+      }
+      break;
+    }
     case UIAction::StartTouchCalibration:
       currentScreen = ScreenId::TouchCalibration;
       calibrationStep = 0;
@@ -441,16 +459,20 @@ void handleUiEvent(const UIEvent &event) {
       break;
     }
     case UIAction::LatPlus:
+      airportCenterActive = false;
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LatMinus:
+      airportCenterActive = false;
       settings.homeLat = constrain(settings.homeLat - 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LonPlus:
+      airportCenterActive = false;
       settings.homeLon += 0.01f;
       if (settings.homeLon > 180.0f) settings.homeLon = -180.0f;
       break;
     case UIAction::LonMinus:
+      airportCenterActive = false;
       settings.homeLon -= 0.01f;
       if (settings.homeLon < -180.0f) settings.homeLon = 180.0f;
       break;
@@ -565,7 +587,7 @@ void drawCurrentScreen(bool force = false) {
       display.drawAircraftDetail(settings, selectedAircraft(), force);
       break;
     case ScreenId::AirportDetail:
-      display.drawAirportDetail(settings, selectedAirport(), force);
+      display.drawAirportDetail(settings, selectedAirport(), aircraft, force);
       break;
     case ScreenId::Settings:
       display.drawSettings(settings, force);

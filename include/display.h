@@ -27,6 +27,7 @@ enum class UIAction : uint8_t {
   ShowSettings,
   ShowDetail,
   ShowAirportDetail,
+  CenterOnAirport,
   StartTouchCalibration,
   RangeNext,
   ToggleTheme,
@@ -59,7 +60,8 @@ class DisplayUI {
   void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force = false);
   void drawAircraftDetail(const AppSettings &settings, const Aircraft *aircraft, bool force = false);
   void drawAirportList(const AppSettings &settings, const std::vector<Airport> &airports, bool force = false);
-  void drawAirportDetail(const AppSettings &settings, const Airport *airport, bool force = false);
+  void drawAirportDetail(const AppSettings &settings, const Airport *airport, const std::vector<Aircraft> &aircraft,
+                         bool force = false);
   void drawSettings(const AppSettings &settings, bool force = false);
   void drawTouchCalibration(const AppSettings &settings, uint8_t step, bool complete = false);
   void drawWiFiSetup(const AppSettings &settings, const String &savedSsid, const String &status);
