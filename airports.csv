@@ -1,0 +1,6 @@
+ident,type,name,latitude_deg,longitude_deg,elevation_ft,continent,iso_country,iso_region,municipality,gps_code,iata_code,local_code
+KIND,large_airport,Indianapolis International Airport,39.7173,-86.2944,797,NA,US,US-IN,Indianapolis,KIND,IND,
+KTYQ,small_airport,Indianapolis Executive Airport,40.0307,-86.2514,913,NA,US,US-IN,Zionsville,KTYQ,,TYQ
+KMQJ,small_airport,Indianapolis Regional Airport,39.8434,-85.8963,862,NA,US,US-IN,Indianapolis,KMQJ,,MQJ
+KHUF,medium_airport,Terre Haute Regional Airport Hulman Field,39.4515,-87.3076,589,NA,US,US-IN,Terre Haute,KHUF,HUF,
+KEYE,small_airport,Eagle Creek Airpark,39.8307,-86.2944,823,NA,US,US-IN,Indianapolis,KEYE,EYE,
