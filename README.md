@@ -1,6 +1,6 @@
 # Plane Radar Pro
 
-PlatformIO Arduino firmware for an ESP32-WROOM-32E 3.5-inch ST7796/XPT2046 touchscreen board.
+PlatformIO Arduino firmware for the LCDWiki ESP32-WROOM-32E 2.8-inch ILI9341/XPT2046 touchscreen board.
 
 Plane Radar Pro is an internet ADS-B radar client. It uses WiFi and the public adsb.fi OpenData API; it is not an SDR receiver and does not require an API key.
 
@@ -18,6 +18,13 @@ To clear saved WiFi, open `Setup` on the touchscreen and hold `Reset WiFi` for 3
 
 ## Hardware
 
+LCDWiki 2.8-inch target:
+
+- Touch SKU: `E32R28T`
+- LCD driver: `ILI9341V`
+- Resolution: `240x320`
+- Display interface: 4-line SPI
+
 LCD:
 
 - CS GPIO15
@@ -25,33 +32,33 @@ LCD:
 - SCK GPIO14
 - MOSI GPIO13
 - MISO GPIO12
-- BL GPIO27
+- BL GPIO21
 
 Touch:
 
 - CS GPIO33
-- SCK GPIO14
-- MOSI GPIO13
-- MISO GPIO12
 - IRQ GPIO36
+- SCK GPIO25
+- MOSI GPIO32
+- MISO GPIO39
 
 Battery:
 
 - Battery voltage ADC sense GPIO34
 - Voltage scale is `BATTERY_ADC_DIVIDER = 2.0f` for the onboard 100k/100k BAT+ divider
 
-This pinout follows the vendor specification plus the Arduino, MicroPython, and ESP-IDF demo code. The uploaded schematic labels appear inconsistent with those sources. SD pins are reserved in `include/config.h` but not used by the current firmware.
+This branch follows the LCDWiki 2.8-inch ESP32-32E display pin assignment. SD pins are reserved in `include/config.h` but not used by the current firmware.
 
 Optional GPS:
 
 - Module type: NEO-6M/GY-GPS6MV2 style NMEA GPS receiver
 - GPS VCC to board 3.3V or 5V according to your module rating
 - GPS GND to GND
-- GPS TX to the board expand input connector pin `IO39` (`GPS_RX`)
+- GPS TX to the board expand pin `IO35` (`GPS_RX`)
 - GPS RX may be left unconnected (`GPS_TX = -1`)
 - Default baud: 9600
 
-Use the 2-pin expand input connector, not the board's `IO3`/`IO1` serial port. The expand input connector exposes `IO35` and `IO39`; both are input-only pins, which is fine because GPS only needs to send NMEA data to the ESP32. The firmware default uses `IO39`.
+Use the expand pin, not the board's `IO3`/`IO1` serial port. The 2.8-inch board exposes `IO35` as an input-only pin, which is fine because GPS only needs to send NMEA data to the ESP32. The firmware default uses `IO35`.
 
 If GPS is connected and has a fresh fix, Plane Radar Pro automatically uses the GPS latitude/longitude as the radar home position. Without a GPS fix, it keeps using the saved/manual home coordinates.
 
@@ -59,7 +66,7 @@ The radar header also shows battery voltage from the board's `IO34` ADC sense li
 
 ## Advanced Radar Features
 
-- Display defaults to portrait orientation (`DEFAULT_ROTATION = 0`) for a 320x480 screen.
+- Display defaults to portrait orientation (`DEFAULT_ROTATION = 0`) for a 240x320 screen.
 - `Setup` includes a saved `Scope` / `Radar` toggle for the main map style.
 - Radar screen uses a dark circular scope layout with green rings, crosshairs, compass labels, range marker, and stacked aircraft labels.
 - Aircraft trails keep the last 20 positions per aircraft.

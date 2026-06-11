@@ -3,7 +3,7 @@
 #include "config.h"
 
 TouchInput::TouchInput()
-    : touchSpi_(HSPI),
+    : touchSpi_(VSPI),
       touch_(Config::TOUCH_CS_PIN, Config::TOUCH_IRQ_PIN) {}
 
 void TouchInput::begin(const AppSettings &settings) {

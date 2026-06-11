@@ -119,7 +119,7 @@ uint16_t DisplayUI::altitudeColor(int32_t altFt) const {
 void DisplayUI::header(const AppSettings &settings, const String &title, const String &rightText) {
   tft_.fillRect(0, 0, tft_.width(), 32, settings.nightMode ? 0x0841 : 0xD69A);
   tft_.setTextColor(fg(settings), settings.nightMode ? 0x0841 : 0xD69A);
-  tft_.setTextFont(2);
+  tft_.setTextFont(tft_.width() < 300 ? 1 : 2);
   tft_.drawString(title, 8, 8);
   tft_.setTextDatum(TR_DATUM);
   tft_.drawString(rightText, tft_.width() - 8, 8);
@@ -132,7 +132,7 @@ void DisplayUI::button(int16_t x, int16_t y, int16_t w, int16_t h, const String 
   tft_.drawRoundRect(x, y, w, h, 6, TFT_DARKGREY);
   tft_.setTextColor(text, fill);
   tft_.setTextDatum(MC_DATUM);
-  tft_.setTextFont(2);
+  tft_.setTextFont(w < 56 ? 1 : 2);
   tft_.drawString(label, x + w / 2, y + h / 2 - 1);
   tft_.setTextDatum(TL_DATUM);
 }
@@ -155,12 +155,15 @@ void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
   const int16_t gap = 4;
   const int16_t w = (tft_.width() - gap * 6) / 5;
   tft_.fillRect(0, y, tft_.width(), 38, panel(settings));
-  button(gap, y + 5, w, 28, "Radar", active == ScreenId::Radar ? accent(settings) : muted(settings), TFT_WHITE);
+  const bool compact = w < 56;
+  button(gap, y + 5, w, 28, compact ? "Rad" : "Radar",
+         active == ScreenId::Radar ? accent(settings) : muted(settings), TFT_WHITE);
   button(gap * 2 + w, y + 5, w, 28, "List", active == ScreenId::AircraftList ? accent(settings) : muted(settings),
          TFT_WHITE);
-  button(gap * 3 + w * 2, y + 5, w, 28, "Range", panel(settings), fg(settings));
+  button(gap * 3 + w * 2, y + 5, w, 28, compact ? "Rng" : "Range", panel(settings), fg(settings));
   button(gap * 4 + w * 3, y + 5, w, 28, settings.nightMode ? "Day" : "Night", panel(settings), fg(settings));
-  button(gap * 5 + w * 4, y + 5, w, 28, "Setup", active == ScreenId::Settings ? accent(settings) : muted(settings),
+  button(gap * 5 + w * 4, y + 5, w, 28, compact ? "Set" : "Setup",
+         active == ScreenId::Settings ? accent(settings) : muted(settings),
          TFT_WHITE);
 }
 
@@ -307,10 +310,10 @@ void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<
     tft_.drawString(aircraftSubtitle(a), 38, y + 18);
     tft_.setTextColor(fg(settings), panel(settings));
     const float d = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
-    tft_.drawString(String(d, 1) + " km", 150, y + 4);
-    tft_.drawString(altText(a.altBaro), 218, y + 4);
+    tft_.drawString(String(d, 1) + " km", 124, y + 4);
+    tft_.drawString(altText(a.altBaro), 124, y + 18);
     tft_.setTextColor(muted(settings), panel(settings));
-    tft_.drawString(speedText(a.groundSpeed), 150, y + 22);
+    tft_.drawString(speedText(a.groundSpeed), 124, y + 32);
   }
   drawBottomNav(settings, ScreenId::AircraftList);
 }
@@ -363,9 +366,10 @@ void DisplayUI::drawWiFiSetup(const AppSettings &settings, const String &savedSs
 
   tft_.setTextDatum(MC_DATUM);
   tft_.setTextColor(fg(settings), bg(settings));
-  tft_.setTextFont(4);
+  tft_.setTextFont(2);
   tft_.drawString("Connect phone to WiFi:", tft_.width() / 2, 78);
   tft_.setTextColor(accent(settings), bg(settings));
+  tft_.setTextFont(4);
   tft_.drawString(Config::WIFI_AP_NAME, tft_.width() / 2, 120);
   tft_.setTextFont(2);
   tft_.setTextColor(fg(settings), bg(settings));
@@ -418,31 +422,37 @@ void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
   header(settings, "Settings", settings.scopeMode ? "Scope" : "Radar");
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(2);
-  tft_.drawString("Latitude", 16, 48);
-  tft_.drawString(String(settings.homeLat, 5), 110, 48);
-  button(226, 42, 36, 28, "-", panel(settings), fg(settings));
-  button(270, 42, 36, 28, "+", accent(settings), TFT_WHITE);
+  const int16_t left = 8;
+  const int16_t valueX = 82;
+  const int16_t minusX = tft_.width() - 78;
+  const int16_t plusX = tft_.width() - 40;
+  const int16_t wideX = tft_.width() - 88;
+  const int16_t wideW = 80;
+  tft_.drawString("Lat", left, 42);
+  tft_.drawString(String(settings.homeLat, 4), valueX, 42);
+  button(minusX, 36, 32, 26, "-", panel(settings), fg(settings));
+  button(plusX, 36, 32, 26, "+", accent(settings), TFT_WHITE);
 
-  tft_.drawString("Longitude", 16, 88);
-  tft_.drawString(String(settings.homeLon, 5), 110, 88);
-  button(226, 82, 36, 28, "-", panel(settings), fg(settings));
-  button(270, 82, 36, 28, "+", accent(settings), TFT_WHITE);
+  tft_.drawString("Lon", left, 76);
+  tft_.drawString(String(settings.homeLon, 4), valueX, 76);
+  button(minusX, 70, 32, 26, "-", panel(settings), fg(settings));
+  button(plusX, 70, 32, 26, "+", accent(settings), TFT_WHITE);
 
-  tft_.drawString("Range", 16, 128);
-  tft_.drawString(String(settings.rangeKm) + " km", 110, 128);
-  button(206, 122, 100, 28, "Change", accent(settings), TFT_WHITE);
+  tft_.drawString("Range", left, 110);
+  tft_.drawString(String(settings.rangeKm) + " km", valueX, 110);
+  button(wideX, 104, wideW, 26, "Change", accent(settings), TFT_WHITE);
 
-  tft_.drawString("Theme", 16, 168);
-  button(110, 162, 86, 28, settings.nightMode ? "Night" : "Day", accent(settings), TFT_WHITE);
-  button(206, 162, 100, 28, settings.scopeMode ? "Scope" : "Radar", accent(settings), TFT_WHITE);
+  tft_.drawString("Theme", left, 144);
+  button(valueX, 138, 66, 26, settings.nightMode ? "Night" : "Day", accent(settings), TFT_WHITE);
+  button(wideX, 138, wideW, 26, settings.scopeMode ? "Scope" : "Radar", accent(settings), TFT_WHITE);
 
-  tft_.drawString("GPS Log", 16, 208);
-  button(110, 202, 86, 28, settings.gpsLogging ? "Log On" : "Log Off",
+  tft_.drawString("GPS Log", left, 178);
+  button(valueX, 172, 66, 26, settings.gpsLogging ? "Log On" : "Log Off",
          settings.gpsLogging ? TFT_GREEN : panel(settings), settings.gpsLogging ? TFT_BLACK : fg(settings));
-  button(206, 202, 100, 28, "Cal Touch", accent(settings), TFT_WHITE);
+  button(wideX, 172, wideW, 26, "Cal", accent(settings), TFT_WHITE);
 
-  button(16, 252, 132, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
-  button(172, 252, 132, 30, "Save", TFT_GREEN, TFT_BLACK);
+  button(8, 220, 106, 28, "Reset WiFi", TFT_RED, TFT_WHITE);
+  button(tft_.width() - 114, 220, 106, 28, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
 }
 
@@ -504,17 +514,22 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
     }
   } else if (screen == ScreenId::Settings) {
-    if (inRect(point.x, point.y, 226, 42, 36, 28)) event.action = UIAction::LatMinus;
-    else if (inRect(point.x, point.y, 270, 42, 36, 28)) event.action = UIAction::LatPlus;
-    else if (inRect(point.x, point.y, 226, 82, 36, 28)) event.action = UIAction::LonMinus;
-    else if (inRect(point.x, point.y, 270, 82, 36, 28)) event.action = UIAction::LonPlus;
-    else if (inRect(point.x, point.y, 206, 122, 100, 28)) event.action = UIAction::RangeNext;
-    else if (inRect(point.x, point.y, 110, 162, 86, 28)) event.action = UIAction::ToggleTheme;
-    else if (inRect(point.x, point.y, 206, 162, 100, 28)) event.action = UIAction::ToggleRadarMode;
-    else if (inRect(point.x, point.y, 110, 202, 86, 28)) event.action = UIAction::ToggleGpsLogging;
-    else if (inRect(point.x, point.y, 206, 202, 100, 28)) event.action = UIAction::StartTouchCalibration;
-    else if (inRect(point.x, point.y, 16, 252, 132, 30)) event.action = UIAction::ResetWiFiHold;
-    else if (inRect(point.x, point.y, 172, 252, 132, 30)) event.action = UIAction::SaveSettings;
+    const int16_t valueX = 82;
+    const int16_t minusX = tft_.width() - 78;
+    const int16_t plusX = tft_.width() - 40;
+    const int16_t wideX = tft_.width() - 88;
+    const int16_t wideW = 80;
+    if (inRect(point.x, point.y, minusX, 36, 32, 26)) event.action = UIAction::LatMinus;
+    else if (inRect(point.x, point.y, plusX, 36, 32, 26)) event.action = UIAction::LatPlus;
+    else if (inRect(point.x, point.y, minusX, 70, 32, 26)) event.action = UIAction::LonMinus;
+    else if (inRect(point.x, point.y, plusX, 70, 32, 26)) event.action = UIAction::LonPlus;
+    else if (inRect(point.x, point.y, wideX, 104, wideW, 26)) event.action = UIAction::RangeNext;
+    else if (inRect(point.x, point.y, valueX, 138, 66, 26)) event.action = UIAction::ToggleTheme;
+    else if (inRect(point.x, point.y, wideX, 138, wideW, 26)) event.action = UIAction::ToggleRadarMode;
+    else if (inRect(point.x, point.y, valueX, 172, 66, 26)) event.action = UIAction::ToggleGpsLogging;
+    else if (inRect(point.x, point.y, wideX, 172, wideW, 26)) event.action = UIAction::StartTouchCalibration;
+    else if (inRect(point.x, point.y, 8, 220, 106, 28)) event.action = UIAction::ResetWiFiHold;
+    else if (inRect(point.x, point.y, tft_.width() - 114, 220, 106, 28)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }
   return event;

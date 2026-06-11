@@ -6,7 +6,7 @@ Plane Radar Pro is an ESP32 touchscreen ADS-B radar that uses WiFi and the publi
 
 Supported target:
 
-- ESP32-WROOM-32E 3.5-inch ST7796 touchscreen board
+- LCDWiki ESP32-WROOM-32E 2.8-inch ILI9341 touchscreen board
 - XPT2046 resistive touch controller
 - Optional NMEA GPS receiver module such as NEO-6M / GY-GPS6MV2
 
@@ -19,39 +19,39 @@ Board pinout used by this firmware:
 | LCD SCK | GPIO14 |
 | LCD MOSI | GPIO13 |
 | LCD MISO | GPIO12 |
-| LCD Backlight | GPIO27 |
+| LCD Backlight | GPIO21 |
 | Touch CS | GPIO33 |
 | Touch IRQ | GPIO36 |
-| Touch SCK | GPIO14 |
-| Touch MOSI | GPIO13 |
-| Touch MISO | GPIO12 |
+| Touch SCK | GPIO25 |
+| Touch MOSI | GPIO32 |
+| Touch MISO | GPIO39 |
 | Battery voltage ADC | GPIO34 |
-| GPS data input | Expand input connector IO39 |
+| GPS data input | Expand pin IO35 |
 | SD CS | GPIO5 |
 | SD SCK | GPIO18 |
 | SD MISO | GPIO19 |
 | SD MOSI | GPIO23 |
 
-This pinout follows the vendor specification plus the Arduino, MicroPython, and ESP-IDF demo code. The uploaded schematic labels appear inconsistent with those sources, so the firmware uses the spec/demo-code wiring.
+This branch follows the LCDWiki 2.8-inch ESP32-32E display pin assignment for the E32R28T ILI9341/XPT2046 board.
 
 ## Optional GPS Wiring
 
-The GPS module is optional. Without it, Plane Radar Pro uses the saved/manual home latitude and longitude. Use the board's 2-pin expand input connector, not the `IO3` / `IO1` serial-port connector.
+The GPS module is optional. Without it, Plane Radar Pro uses the saved/manual home latitude and longitude. Use the board's `IO35` expand input pin, not the `IO3` / `IO1` serial-port connector.
 
 | GPS module pin | ESP32 connection |
 | --- | --- |
 | VCC | 3.3V or 5V, depending on your module rating |
 | GND | GND |
-| TX | 2-pin expand input connector `IO39` |
+| TX | Expand input pin `IO35` |
 | RX | Leave unconnected |
 
 Default GPS data settings:
 
-- Data input pin: GPIO39
+- Data input pin: GPIO35
 - Baud: 9600
 - ESP32 output to GPS: disabled (`GPS_TX = -1`)
 
-The expand input connector exposes `IO35` and `IO39`; both are input-only pins, which is fine because GPS only needs to send NMEA data to the ESP32. The firmware default uses `IO39`. If your connector wiring is easier on `IO35`, change `GPS_RX` to `35` in `include/config.h`.
+The 2.8-inch board exposes `IO35` as an input-only expand pin, which is fine because GPS only needs to send NMEA data to the ESP32. The firmware default uses `IO35`.
 
 When GPS has a fresh fix, the radar automatically uses the GPS latitude and longitude as the home position. The top bar shows GPS status such as `No GPS`, `No fix`, or `Fix 8 sat`.
 
@@ -59,7 +59,7 @@ When GPS has a fresh fix, the radar automatically uses the GPS latitude and long
 
 Scope-style radar:
 
-- The advanced branch defaults to portrait orientation on the 320x480 screen.
+- This branch defaults to portrait orientation on the 240x320 screen.
 - Open `Setup` and tap `Scope` / `Radar` to switch between the dark circular scope and a lighter conventional radar style.
 - The selected screen mode is saved in ESP32 Preferences/NVS.
 - The radar screen uses a dark circular display with green range rings and crosshairs.
@@ -264,7 +264,7 @@ If WiFi disconnects while running, the radar screen stays visible, shows `WiFi l
 
 If the screen is blank:
 
-- Confirm the board is the ESP32-WROOM-32E ST7796 model.
+- Confirm the board is the LCDWiki ESP32-WROOM-32E 2.8-inch ILI9341 model.
 - Confirm the firmware pinout matches this manual.
 - Try another USB cable and power source.
 
@@ -275,7 +275,7 @@ If touch is offset:
 
 If GPS shows `No GPS`:
 
-- Confirm GPS TX is wired to the 2-pin expand input connector `IO39`, or to the pin configured as `GPS_RX`.
+- Confirm GPS TX is wired to expand input pin `IO35`, or to the pin configured as `GPS_RX`.
 - Confirm GPS GND is connected to ESP32 GND.
 - Move the antenna near a window or outdoors.
 - Wait several minutes for first fix.
