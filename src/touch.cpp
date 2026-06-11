@@ -30,3 +30,7 @@ TouchPoint TouchInput::read(const AppSettings &settings) {
   Serial.printf("[touch] raw=(%d,%d,%d) mapped=(%d,%d)\n", raw.x, raw.y, raw.z, point.x, point.y);
   return point;
 }
+
+bool TouchInput::isTouched() {
+  return touch_.touched();
+}

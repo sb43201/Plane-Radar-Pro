@@ -27,7 +27,8 @@ enum class UIAction : uint8_t {
   LatMinus,
   LonPlus,
   LonMinus,
-  SaveSettings
+  SaveSettings,
+  ResetWiFiHold
 };
 
 struct UIEvent {
@@ -39,11 +40,12 @@ class DisplayUI {
  public:
   void begin(const AppSettings &settings);
   void showSplash();
-  void drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft, const String &status,
-                 const String &timeText, const String &lastUpdateText, bool force = false);
+  void drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft, const String &wifiStatus,
+                 const String &gpsStatus, const String &timeText, const String &lastUpdateText, bool force = false);
   void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force = false);
   void drawAircraftDetail(const AppSettings &settings, const Aircraft *aircraft, bool force = false);
   void drawSettings(const AppSettings &settings, bool force = false);
+  void drawWiFiSetup(const AppSettings &settings, const String &savedSsid, const String &status);
   UIEvent handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
                       const std::vector<Aircraft> &aircraft);
   void invalidate();

@@ -5,7 +5,8 @@
 namespace Config {
 constexpr const char *APP_NAME = "Plane Radar Pro";
 constexpr const char *APP_SUBTITLE = "ESP32 ADS-B Tracker";
-constexpr const char *WIFI_AP_NAME = "PlaneRadarPro-Setup";
+constexpr const char *WIFI_AP_NAME = "PlaneRadar-Setup";
+constexpr const char *WIFI_SETUP_URL = "192.168.4.1";
 
 constexpr uint8_t LCD_CS = 15;
 constexpr uint8_t LCD_DC = 2;
@@ -25,6 +26,12 @@ constexpr uint8_t SD_SCK = 18;
 constexpr uint8_t SD_MOSI = 23;
 constexpr uint8_t SD_MISO = 19;
 
+constexpr bool GPS_ENABLED = true;
+constexpr uint8_t GPS_RX = 16;
+constexpr uint8_t GPS_TX = 17;
+constexpr uint32_t GPS_BAUD = 9600;
+constexpr uint32_t GPS_FIX_MAX_AGE_MS = 10000;
+
 constexpr uint16_t SCREEN_W = 480;
 constexpr uint16_t SCREEN_H = 320;
 constexpr uint8_t DEFAULT_ROTATION = 1;
@@ -42,6 +49,8 @@ constexpr size_t RANGE_OPTION_COUNT = sizeof(RANGE_OPTIONS) / sizeof(RANGE_OPTIO
 
 constexpr uint32_t ADSB_REFRESH_MS = 5000;
 constexpr uint32_t WIFI_RECONNECT_MS = 10000;
+constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 60000;
+constexpr uint32_t WIFI_RESET_HOLD_MS = 3000;
 constexpr uint32_t UI_CLOCK_MS = 1000;
 constexpr size_t MAX_AIRCRAFT = 80;
 constexpr size_t TRAIL_POINTS = 20;

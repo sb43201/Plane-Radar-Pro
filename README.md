@@ -12,7 +12,9 @@ pio run -t upload
 pio device monitor -b 115200
 ```
 
-On first boot, connect to the `PlaneRadarPro-Setup` captive portal and choose WiFi. Home latitude/longitude, range, theme, rotation, and touch calibration are stored in ESP32 Preferences/NVS.
+On first boot, connect your phone to the `PlaneRadar-Setup` captive portal and open `192.168.4.1`. Choose your phone hotspot SSID, enter the password, and the ESP32 will save the credentials in flash/NVS. Future boots retry the saved hotspot for up to 60 seconds before opening setup mode again.
+
+To clear saved WiFi, open `Setup` on the touchscreen and hold `Reset WiFi` for 3 seconds. The ESP32 clears the saved credentials, restarts, and opens `PlaneRadar-Setup`.
 
 ## Hardware
 
@@ -32,6 +34,17 @@ Touch:
 - Touch shares LCD SPI: SCK GPIO14, MOSI GPIO13, MISO GPIO12
 
 SD pins are reserved in `include/config.h` but not used by the current firmware.
+
+Optional GPS:
+
+- Module type: NEO-6M/GY-GPS6MV2 style UART GPS
+- GPS VCC to board 3.3V or 5V according to your module rating
+- GPS GND to GND
+- GPS TX to ESP32 GPIO16 (`GPS_RX`)
+- GPS RX to ESP32 GPIO17 (`GPS_TX`, optional)
+- Default baud: 9600
+
+If GPS is connected and has a fresh fix, Plane Radar Pro automatically uses the GPS latitude/longitude as the radar home position. Without a GPS fix, it keeps using the saved/manual home coordinates.
 
 ## Calibration
 

@@ -17,6 +17,7 @@ class TouchInput {
   TouchInput();
   void begin(const AppSettings &settings);
   TouchPoint read(const AppSettings &settings);
+  bool isTouched();
 
  private:
   SPIClass touchSpi_;
