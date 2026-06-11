@@ -49,7 +49,7 @@ When GPS has a fresh fix, the radar automatically uses the GPS latitude and long
 ## Build And Upload
 
 1. Open VS Code.
-2. Open the folder `C:\Users\binsu\Documents\Plane Radar`.
+2. Open the cloned `Plane-Radar-Pro` project folder.
 3. Click the PlatformIO icon.
 4. Use `Project Tasks > esp32dev > General > Build`.
 5. Use `Project Tasks > esp32dev > General > Upload`.
