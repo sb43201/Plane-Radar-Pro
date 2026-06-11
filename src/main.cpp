@@ -395,6 +395,11 @@ void handleUiEvent(const UIEvent &event) {
       lastGpsLogMs = 0;
       Serial.printf("[settings] gpsLogging=%s\n", settings.gpsLogging ? "true" : "false");
       break;
+    case UIAction::ToggleRadarMode:
+      settings.scopeMode = !settings.scopeMode;
+      settingsStore.save(settings);
+      Serial.printf("[settings] radarMode=%s\n", settings.scopeMode ? "scope" : "radar");
+      break;
     case UIAction::LatPlus:
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);
       break;

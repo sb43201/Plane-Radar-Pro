@@ -59,6 +59,8 @@ The radar header also shows battery voltage from the board's `IO34` ADC sense li
 
 ## Advanced Radar Features
 
+- Display defaults to portrait orientation (`DEFAULT_ROTATION = 0`) for a 320x480 screen.
+- `Setup` includes a saved `Scope` / `Radar` toggle for the main map style.
 - Radar screen uses a dark circular scope layout with green rings, crosshairs, compass labels, range marker, and stacked aircraft labels.
 - Aircraft trails keep the last 20 positions per aircraft.
 - Airport overlays mark `IND`, `HUF`, and `MQJ` when they are inside the selected radar range.

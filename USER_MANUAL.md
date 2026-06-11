@@ -59,6 +59,9 @@ When GPS has a fresh fix, the radar automatically uses the GPS latitude and long
 
 Scope-style radar:
 
+- The advanced branch defaults to portrait orientation on the 320x480 screen.
+- Open `Setup` and tap `Scope` / `Radar` to switch between the dark circular scope and a lighter conventional radar style.
+- The selected screen mode is saved in ESP32 Preferences/NVS.
 - The radar screen uses a dark circular display with green range rings and crosshairs.
 - Compass labels and range text are drawn around the scope.
 - Aircraft labels show flight, aircraft type/category, and altitude next to the icon.
@@ -225,6 +228,7 @@ Settings screen:
 | Longitude +/- | Adjust manual home longitude |
 | Range Change | Cycle radar range |
 | Theme | Toggle day/night mode |
+| Scope / Radar | Toggle main radar display style |
 | Cal Touch | Start four-point touchscreen calibration |
 | Log On / Log Off | Toggle GPS location logging |
 | Reset WiFi | Hold 3 seconds to reset WiFi |

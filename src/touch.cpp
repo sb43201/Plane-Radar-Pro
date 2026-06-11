@@ -6,10 +6,10 @@ TouchInput::TouchInput()
     : touchSpi_(HSPI),
       touch_(Config::TOUCH_CS_PIN, Config::TOUCH_IRQ_PIN) {}
 
-void TouchInput::begin(const AppSettings &) {
+void TouchInput::begin(const AppSettings &settings) {
   touchSpi_.begin(Config::TOUCH_SCK, Config::TOUCH_MISO, Config::TOUCH_MOSI, Config::TOUCH_CS_PIN);
   touch_.begin(touchSpi_);
-  touch_.setRotation(1);
+  touch_.setRotation(settings.displayRotation);
   Serial.println("[touch] XPT2046 initialized");
 }
 

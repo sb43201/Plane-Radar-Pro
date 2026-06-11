@@ -41,9 +41,9 @@ constexpr float BATTERY_ADC_DIVIDER = 2.0f;
 constexpr uint16_t BATTERY_ADC_SAMPLES = 16;
 constexpr uint32_t BATTERY_REFRESH_MS = 2000;
 
-constexpr uint16_t SCREEN_W = 480;
-constexpr uint16_t SCREEN_H = 320;
-constexpr uint8_t DEFAULT_ROTATION = 1;
+constexpr uint16_t SCREEN_W = 320;
+constexpr uint16_t SCREEN_H = 480;
+constexpr uint8_t DEFAULT_ROTATION = 0;
 
 constexpr int TOUCH_MIN_X = 300;
 constexpr int TOUCH_MAX_X = 3800;

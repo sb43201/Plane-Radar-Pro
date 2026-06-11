@@ -26,6 +26,7 @@ enum class UIAction : uint8_t {
   RangeNext,
   ToggleTheme,
   ToggleGpsLogging,
+  ToggleRadarMode,
   LatPlus,
   LatMinus,
   LonPlus,

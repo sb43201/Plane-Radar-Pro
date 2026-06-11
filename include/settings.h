@@ -16,6 +16,7 @@ struct AppSettings {
   int touchMinY = Config::TOUCH_MIN_Y;
   int touchMaxY = Config::TOUCH_MAX_Y;
   bool gpsLogging = false;
+  bool scopeMode = true;
 };
 
 class SettingsStore {

@@ -136,13 +136,15 @@ void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t c
 
 void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
   const int16_t y = tft_.height() - 38;
+  const int16_t gap = 4;
+  const int16_t w = (tft_.width() - gap * 6) / 5;
   tft_.fillRect(0, y, tft_.width(), 38, panel(settings));
-  button(6, y + 5, 82, 28, "Radar", active == ScreenId::Radar ? accent(settings) : muted(settings), TFT_WHITE);
-  button(96, y + 5, 82, 28, "List", active == ScreenId::AircraftList ? accent(settings) : muted(settings),
+  button(gap, y + 5, w, 28, "Radar", active == ScreenId::Radar ? accent(settings) : muted(settings), TFT_WHITE);
+  button(gap * 2 + w, y + 5, w, 28, "List", active == ScreenId::AircraftList ? accent(settings) : muted(settings),
          TFT_WHITE);
-  button(186, y + 5, 92, 28, "Range", panel(settings), fg(settings));
-  button(286, y + 5, 92, 28, settings.nightMode ? "Day" : "Night", panel(settings), fg(settings));
-  button(386, y + 5, 88, 28, "Setup", active == ScreenId::Settings ? accent(settings) : muted(settings),
+  button(gap * 3 + w * 2, y + 5, w, 28, "Range", panel(settings), fg(settings));
+  button(gap * 4 + w * 3, y + 5, w, 28, settings.nightMode ? "Day" : "Night", panel(settings), fg(settings));
+  button(gap * 5 + w * 4, y + 5, w, 28, "Setup", active == ScreenId::Settings ? accent(settings) : muted(settings),
          TFT_WHITE);
 }
 
@@ -152,20 +154,20 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
                           const String &alertText, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  const uint16_t scopeBg = TFT_BLACK;
-  const uint16_t grid = 0x07E0;
-  const uint16_t gridDim = 0x03A0;
-  const uint16_t text = 0xB7FF;
-  const uint16_t dimText = 0x7BEF;
-  const uint16_t airportColor = TFT_MAGENTA;
+  const uint16_t scopeBg = settings.scopeMode ? TFT_BLACK : bg(settings);
+  const uint16_t grid = settings.scopeMode ? 0x07E0 : accent(settings);
+  const uint16_t gridDim = settings.scopeMode ? 0x03A0 : muted(settings);
+  const uint16_t text = settings.scopeMode ? 0xB7FF : fg(settings);
+  const uint16_t dimText = settings.scopeMode ? 0x7BEF : muted(settings);
+  const uint16_t airportColor = settings.scopeMode ? TFT_MAGENTA : TFT_ORANGE;
   tft_.fillScreen(scopeBg);
 
   const int16_t cx = tft_.width() / 2;
-  const int16_t cy = 156;
-  const int16_t radius = 112;
+  const int16_t cy = 190;
+  const int16_t radius = min((int16_t)132, (int16_t)((tft_.width() - 42) / 2));
 
-  tft_.drawCircle(cx, cy, radius + 5, 0x39E7);
-  tft_.drawCircle(cx, cy, radius + 2, 0x18E3);
+  tft_.drawCircle(cx, cy, radius + 5, settings.scopeMode ? 0x39E7 : gridDim);
+  tft_.drawCircle(cx, cy, radius + 2, settings.scopeMode ? 0x18E3 : panel(settings));
   for (uint8_t ring = 1; ring <= 4; ++ring) {
     tft_.drawCircle(cx, cy, radius * ring / 4, gridDim);
   }
@@ -192,14 +194,16 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
 
   tft_.setTextFont(1);
   tft_.setTextColor(text, scopeBg);
-  tft_.drawString("AC " + String(aircraft.size()), 8, 4);
-  tft_.drawString("WiFi " + wifiStatus, 58, 4);
-  tft_.drawString("GPS " + gpsStatus, 150, 4);
+  tft_.drawString(settings.scopeMode ? "SCOPE" : "RADAR", 6, 4);
+  tft_.drawString("AC " + String(aircraft.size()), 58, 4);
+  tft_.drawString("WiFi " + wifiStatus, 6, 16);
+  tft_.drawString("GPS " + gpsStatus, 6, 28);
   tft_.setTextDatum(TR_DATUM);
-  tft_.drawString(timeText + "  " + batteryStatus, tft_.width() - 8, 4);
+  tft_.drawString(timeText, tft_.width() - 6, 4);
+  tft_.drawString(batteryStatus, tft_.width() - 6, 16);
   tft_.setTextDatum(TL_DATUM);
   tft_.setTextColor(dimText, scopeBg);
-  tft_.drawString(lastUpdateText, 8, 18);
+  tft_.drawString(lastUpdateText, 6, 40);
 
   for (const AirportOverlay &airport : AIRPORTS) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, airport.lat, airport.lon, settings.rangeKm, cx,
@@ -236,21 +240,23 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
 
   if (alertText.length()) {
     const uint16_t fill = 0xA000;
-    tft_.fillRoundRect(54, 28, tft_.width() - 108, 20, 4, fill);
+    tft_.fillRoundRect(46, 52, tft_.width() - 92, 20, 4, fill);
     tft_.setTextColor(TFT_WHITE, fill);
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextFont(1);
-    tft_.drawString(alertText, tft_.width() / 2, 38);
+    tft_.drawString(alertText, tft_.width() / 2, 62);
     tft_.setTextDatum(TL_DATUM);
   }
 
   if (gpsCompass.length()) {
-    const int16_t compassY = alertText.length() ? 52 : 28;
-    tft_.fillRoundRect(366, compassY, 104, 20, 4, 0x0841);
-    tft_.setTextColor(text, 0x0841);
+    const int16_t compassY = alertText.length() ? 76 : 52;
+    const int16_t compassX = tft_.width() - 92;
+    const uint16_t compassFill = settings.scopeMode ? 0x0841 : panel(settings);
+    tft_.fillRoundRect(compassX, compassY, 86, 20, 4, compassFill);
+    tft_.setTextColor(text, compassFill);
     tft_.setTextDatum(MC_DATUM);
     tft_.setTextFont(1);
-    tft_.drawString(gpsCompass, 418, compassY + 10);
+    tft_.drawString(gpsCompass, compassX + 43, compassY + 10);
     tft_.setTextDatum(TL_DATUM);
   }
 
@@ -271,9 +277,9 @@ void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<
   }
   for (uint8_t row = 0; row < order.size(); ++row) {
     const Aircraft &a = aircraft[order[row]];
-    const int16_t y = 42 + row * 38;
-    tft_.fillRoundRect(8, y, tft_.width() - 16, 32, 5, panel(settings));
-    tft_.fillCircle(22, y + 16, 6, altitudeColor(a.altBaro));
+    const int16_t y = 42 + row * 50;
+    tft_.fillRoundRect(8, y, tft_.width() - 16, 44, 5, panel(settings));
+    tft_.fillCircle(22, y + 15, 6, altitudeColor(a.altBaro));
     tft_.setTextColor(fg(settings), panel(settings));
     tft_.drawString(safeFlight(a), 38, y + 4);
     tft_.setTextColor(muted(settings), panel(settings));
@@ -281,8 +287,9 @@ void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<
     tft_.setTextColor(fg(settings), panel(settings));
     const float d = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
     tft_.drawString(String(d, 1) + " km", 150, y + 4);
-    tft_.drawString(altText(a.altBaro), 230, y + 4);
-    tft_.drawString(speedText(a.groundSpeed), 340, y + 4);
+    tft_.drawString(altText(a.altBaro), 218, y + 4);
+    tft_.setTextColor(muted(settings), panel(settings));
+    tft_.drawString(speedText(a.groundSpeed), 150, y + 22);
   }
   drawBottomNav(settings, ScreenId::AircraftList);
 }
@@ -304,7 +311,7 @@ void DisplayUI::drawAircraftDetail(const AppSettings &settings, const Aircraft *
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(4);
   tft_.drawString(safeFlight(a), 18, 52);
-  drawAircraftIcon(430, 68, a.track, altitudeColor(a.altBaro), false);
+  drawAircraftIcon(tft_.width() - 36, 68, a.track, altitudeColor(a.altBaro), false);
 
   tft_.setTextFont(2);
   const float dist = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
@@ -321,9 +328,9 @@ void DisplayUI::drawAircraftDetail(const AppSettings &settings, const Aircraft *
       "Category: " + (a.category.length() ? a.category : String("---"))};
 
   for (uint8_t i = 0; i < 9; ++i) {
-    tft_.fillRoundRect(18 + (i % 2) * 225, 100 + (i / 2) * 36, 210, 28, 5, panel(settings));
+    tft_.fillRoundRect(18, 100 + i * 34, tft_.width() - 36, 28, 5, panel(settings));
     tft_.setTextColor(fg(settings), panel(settings));
-    tft_.drawString(rows[i], 26 + (i % 2) * 225, 106 + (i / 2) * 36);
+    tft_.drawString(rows[i], 26, 106 + i * 34);
   }
   drawBottomNav(settings, ScreenId::Detail);
 }
@@ -387,30 +394,34 @@ void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
-  header(settings, "Home Settings", settings.nightMode ? "Night" : "Day");
+  header(settings, "Settings", settings.scopeMode ? "Scope" : "Radar");
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(2);
-  tft_.drawString("Latitude", 34, 58);
-  tft_.drawString(String(settings.homeLat, 5), 170, 58);
-  button(328, 50, 56, 30, "-", panel(settings), fg(settings));
-  button(394, 50, 56, 30, "+", accent(settings), TFT_WHITE);
+  tft_.drawString("Latitude", 16, 48);
+  tft_.drawString(String(settings.homeLat, 5), 110, 48);
+  button(226, 42, 36, 28, "-", panel(settings), fg(settings));
+  button(270, 42, 36, 28, "+", accent(settings), TFT_WHITE);
 
-  tft_.drawString("Longitude", 34, 106);
-  tft_.drawString(String(settings.homeLon, 5), 170, 106);
-  button(328, 98, 56, 30, "-", panel(settings), fg(settings));
-  button(394, 98, 56, 30, "+", accent(settings), TFT_WHITE);
+  tft_.drawString("Longitude", 16, 88);
+  tft_.drawString(String(settings.homeLon, 5), 110, 88);
+  button(226, 82, 36, 28, "-", panel(settings), fg(settings));
+  button(270, 82, 36, 28, "+", accent(settings), TFT_WHITE);
 
-  tft_.drawString("Radar range", 34, 154);
-  tft_.drawString(String(settings.rangeKm) + " km", 170, 154);
-  button(328, 146, 122, 30, "Change", accent(settings), TFT_WHITE);
+  tft_.drawString("Range", 16, 128);
+  tft_.drawString(String(settings.rangeKm) + " km", 110, 128);
+  button(206, 122, 100, 28, "Change", accent(settings), TFT_WHITE);
 
-  tft_.drawString("Theme", 34, 202);
-  button(170, 194, 122, 30, settings.nightMode ? "Night" : "Day", accent(settings), TFT_WHITE);
-  button(328, 194, 122, 30, "Cal Touch", accent(settings), TFT_WHITE);
-  button(34, 242, 122, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
-  button(170, 242, 122, 30, settings.gpsLogging ? "Log On" : "Log Off", settings.gpsLogging ? TFT_GREEN : panel(settings),
-         settings.gpsLogging ? TFT_BLACK : fg(settings));
-  button(328, 242, 122, 30, "Save", TFT_GREEN, TFT_BLACK);
+  tft_.drawString("Theme", 16, 168);
+  button(110, 162, 86, 28, settings.nightMode ? "Night" : "Day", accent(settings), TFT_WHITE);
+  button(206, 162, 100, 28, settings.scopeMode ? "Scope" : "Radar", accent(settings), TFT_WHITE);
+
+  tft_.drawString("GPS Log", 16, 208);
+  button(110, 202, 86, 28, settings.gpsLogging ? "Log On" : "Log Off",
+         settings.gpsLogging ? TFT_GREEN : panel(settings), settings.gpsLogging ? TFT_BLACK : fg(settings));
+  button(206, 202, 100, 28, "Cal Touch", accent(settings), TFT_WHITE);
+
+  button(16, 252, 132, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
+  button(172, 252, 132, 30, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
 }
 
@@ -424,8 +435,8 @@ const Aircraft *DisplayUI::findAircraft(const std::vector<Aircraft> &aircraft, c
 String DisplayUI::hitAircraft(int16_t x, int16_t y, const AppSettings &settings,
                               const std::vector<Aircraft> &aircraft) {
   const int16_t cx = tft_.width() / 2;
-  const int16_t cy = 156;
-  const int16_t radius = 112;
+  const int16_t cy = 190;
+  const int16_t radius = min((int16_t)132, (int16_t)((tft_.width() - 42) / 2));
   for (const Aircraft &a : aircraft) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
     if (!p.visible) continue;
@@ -440,11 +451,13 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   if (!point.touched) return event;
 
   const int16_t navY = tft_.height() - 38;
-  if (inRect(point.x, point.y, 6, navY + 5, 82, 28)) event.action = UIAction::ShowRadar;
-  else if (inRect(point.x, point.y, 96, navY + 5, 82, 28)) event.action = UIAction::ShowList;
-  else if (inRect(point.x, point.y, 186, navY + 5, 92, 28)) event.action = UIAction::RangeNext;
-  else if (inRect(point.x, point.y, 286, navY + 5, 92, 28)) event.action = UIAction::ToggleTheme;
-  else if (inRect(point.x, point.y, 386, navY + 5, 88, 28)) event.action = UIAction::ShowSettings;
+  const int16_t gap = 4;
+  const int16_t navW = (tft_.width() - gap * 6) / 5;
+  if (inRect(point.x, point.y, gap, navY + 5, navW, 28)) event.action = UIAction::ShowRadar;
+  else if (inRect(point.x, point.y, gap * 2 + navW, navY + 5, navW, 28)) event.action = UIAction::ShowList;
+  else if (inRect(point.x, point.y, gap * 3 + navW * 2, navY + 5, navW, 28)) event.action = UIAction::RangeNext;
+  else if (inRect(point.x, point.y, gap * 4 + navW * 3, navY + 5, navW, 28)) event.action = UIAction::ToggleTheme;
+  else if (inRect(point.x, point.y, gap * 5 + navW * 4, navY + 5, navW, 28)) event.action = UIAction::ShowSettings;
 
   if (event.action != UIAction::None) {
     dirty_ = true;
@@ -461,7 +474,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   } else if (screen == ScreenId::AircraftList) {
     auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, 6);
     for (uint8_t row = 0; row < order.size(); ++row) {
-      if (inRect(point.x, point.y, 8, 42 + row * 38, tft_.width() - 16, 32)) {
+      if (inRect(point.x, point.y, 8, 42 + row * 50, tft_.width() - 16, 44)) {
         event.aircraftHex = aircraft[order[row]].hex;
         selectedHex_ = event.aircraftHex;
         event.action = UIAction::ShowDetail;
@@ -470,16 +483,17 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
     }
   } else if (screen == ScreenId::Settings) {
-    if (inRect(point.x, point.y, 328, 50, 56, 30)) event.action = UIAction::LatMinus;
-    else if (inRect(point.x, point.y, 394, 50, 56, 30)) event.action = UIAction::LatPlus;
-    else if (inRect(point.x, point.y, 328, 98, 56, 30)) event.action = UIAction::LonMinus;
-    else if (inRect(point.x, point.y, 394, 98, 56, 30)) event.action = UIAction::LonPlus;
-    else if (inRect(point.x, point.y, 328, 146, 122, 30)) event.action = UIAction::RangeNext;
-    else if (inRect(point.x, point.y, 170, 194, 122, 30)) event.action = UIAction::ToggleTheme;
-    else if (inRect(point.x, point.y, 328, 194, 122, 30)) event.action = UIAction::StartTouchCalibration;
-    else if (inRect(point.x, point.y, 34, 242, 122, 30)) event.action = UIAction::ResetWiFiHold;
-    else if (inRect(point.x, point.y, 170, 242, 122, 30)) event.action = UIAction::ToggleGpsLogging;
-    else if (inRect(point.x, point.y, 328, 242, 122, 30)) event.action = UIAction::SaveSettings;
+    if (inRect(point.x, point.y, 226, 42, 36, 28)) event.action = UIAction::LatMinus;
+    else if (inRect(point.x, point.y, 270, 42, 36, 28)) event.action = UIAction::LatPlus;
+    else if (inRect(point.x, point.y, 226, 82, 36, 28)) event.action = UIAction::LonMinus;
+    else if (inRect(point.x, point.y, 270, 82, 36, 28)) event.action = UIAction::LonPlus;
+    else if (inRect(point.x, point.y, 206, 122, 100, 28)) event.action = UIAction::RangeNext;
+    else if (inRect(point.x, point.y, 110, 162, 86, 28)) event.action = UIAction::ToggleTheme;
+    else if (inRect(point.x, point.y, 206, 162, 100, 28)) event.action = UIAction::ToggleRadarMode;
+    else if (inRect(point.x, point.y, 110, 202, 86, 28)) event.action = UIAction::ToggleGpsLogging;
+    else if (inRect(point.x, point.y, 206, 202, 100, 28)) event.action = UIAction::StartTouchCalibration;
+    else if (inRect(point.x, point.y, 16, 252, 132, 30)) event.action = UIAction::ResetWiFiHold;
+    else if (inRect(point.x, point.y, 172, 252, 132, 30)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }
   return event;
