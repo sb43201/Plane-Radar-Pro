@@ -408,8 +408,8 @@ void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
   button(170, 194, 122, 30, settings.nightMode ? "Night" : "Day", accent(settings), TFT_WHITE);
   button(328, 194, 122, 30, "Cal Touch", accent(settings), TFT_WHITE);
   button(34, 242, 122, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
-  tft_.setTextColor(muted(settings), bg(settings));
-  tft_.drawString("Hold 3 sec", 170, 250);
+  button(170, 242, 122, 30, settings.gpsLogging ? "Log On" : "Log Off", settings.gpsLogging ? TFT_GREEN : panel(settings),
+         settings.gpsLogging ? TFT_BLACK : fg(settings));
   button(328, 242, 122, 30, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
 }
@@ -478,6 +478,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inRect(point.x, point.y, 170, 194, 122, 30)) event.action = UIAction::ToggleTheme;
     else if (inRect(point.x, point.y, 328, 194, 122, 30)) event.action = UIAction::StartTouchCalibration;
     else if (inRect(point.x, point.y, 34, 242, 122, 30)) event.action = UIAction::ResetWiFiHold;
+    else if (inRect(point.x, point.y, 170, 242, 122, 30)) event.action = UIAction::ToggleGpsLogging;
     else if (inRect(point.x, point.y, 328, 242, 122, 30)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }

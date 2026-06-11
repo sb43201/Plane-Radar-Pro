@@ -89,6 +89,21 @@ GPS compass:
 - When GPS is present and reports course-over-ground, the radar shows a small compass readout such as `NE 045 deg`.
 - This is a movement-based GPS course, not a magnetic compass, so it may be blank or unstable when the device is stationary.
 
+GPS logging:
+
+- GPS logging is off by default.
+- Open `Setup` and tap `Log Off` to turn logging on. The button changes to `Log On`.
+- The setting is saved in ESP32 Preferences/NVS.
+- Logs are saved to SPIFFS as CSV at `/gps_log.csv`.
+- A row is written every `GPS_LOG_INTERVAL_MS`, default `10000 ms`, only when GPS has a valid fix.
+- The log rotates when it reaches `GPS_LOG_MAX_BYTES`, default `262144 bytes`.
+
+CSV columns:
+
+```text
+millis,local_time,lat,lon,speed_kmph,course_deg,satellites
+```
+
 ## Battery Voltage
 
 Plane Radar Pro reads the board battery voltage sense line on `IO34` and shows it in the radar header as `Bat x.xxV`. The schematic shows BAT+ feeding `BAT_ADC` through a 100k/100k divider, so the ESP32 ADC sees half of the actual battery voltage.
@@ -211,6 +226,7 @@ Settings screen:
 | Range Change | Cycle radar range |
 | Theme | Toggle day/night mode |
 | Cal Touch | Start four-point touchscreen calibration |
+| Log On / Log Off | Toggle GPS location logging |
 | Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
 

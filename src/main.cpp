@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <FS.h>
+#include <SPIFFS.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <time.h>
@@ -28,8 +30,10 @@ uint32_t lastAdsbMs = 0;
 uint32_t lastReconnectMs = 0;
 uint32_t lastClockMs = 0;
 uint32_t lastBatteryMs = 0;
+uint32_t lastGpsLogMs = 0;
 bool timeConfigured = false;
 bool wifiPortalSaved = false;
+bool filesystemReady = false;
 uint32_t resetWiFiHoldStartMs = 0;
 uint32_t resetWiFiLastTouchMs = 0;
 String gpsStatus = "No GPS";
@@ -41,6 +45,7 @@ uint8_t calibrationStep = 0;
 bool calibrationWaitingForRelease = false;
 
 void updateAircraftAlerts();
+void processGpsLogging();
 
 void markWifiPortalSaved() {
   wifiPortalSaved = true;
@@ -52,6 +57,14 @@ String localTimeText() {
   if (!getLocalTime(&timeinfo, 5)) return "--:--:--";
   char buffer[16];
   strftime(buffer, sizeof(buffer), "%H:%M:%S", &timeinfo);
+  return String(buffer);
+}
+
+String localDateTimeText() {
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo, 5)) return "";
+  char buffer[24];
+  strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
   return String(buffer);
 }
 
@@ -98,6 +111,80 @@ void updateBatteryStatus(bool force = false) {
     display.invalidate();
     Serial.printf("[battery] adc=%lu mV battery=%.2f V\n", millivolts, batteryVolts);
   }
+}
+
+void initializeGpsLog() {
+  filesystemReady = SPIFFS.begin(true);
+  if (!filesystemReady) {
+    Serial.println("[gps-log] SPIFFS mount failed; GPS logging disabled until reboot");
+    return;
+  }
+
+  if (!SPIFFS.exists(Config::GPS_LOG_PATH)) {
+    File file = SPIFFS.open(Config::GPS_LOG_PATH, FILE_WRITE);
+    if (!file) {
+      Serial.println("[gps-log] could not create log file");
+      return;
+    }
+    file.println("millis,local_time,lat,lon,speed_kmph,course_deg,satellites");
+    file.close();
+  }
+  Serial.printf("[gps-log] ready path=%s size=%u bytes\n", Config::GPS_LOG_PATH,
+                (unsigned)SPIFFS.open(Config::GPS_LOG_PATH, FILE_READ).size());
+}
+
+void rotateGpsLogIfNeeded() {
+  if (!filesystemReady || !SPIFFS.exists(Config::GPS_LOG_PATH)) return;
+  File file = SPIFFS.open(Config::GPS_LOG_PATH, FILE_READ);
+  if (!file) return;
+  const size_t size = file.size();
+  file.close();
+  if (size < Config::GPS_LOG_MAX_BYTES) return;
+
+  Serial.printf("[gps-log] rotating log at %u bytes\n", (unsigned)size);
+  SPIFFS.remove(Config::GPS_LOG_PATH);
+  File fresh = SPIFFS.open(Config::GPS_LOG_PATH, FILE_WRITE);
+  if (fresh) {
+    fresh.println("millis,local_time,lat,lon,speed_kmph,course_deg,satellites");
+    fresh.close();
+  }
+}
+
+void appendGpsLogLine() {
+  if (!filesystemReady || !gps.hasFix()) return;
+  rotateGpsLogIfNeeded();
+
+  File file = SPIFFS.open(Config::GPS_LOG_PATH, FILE_APPEND);
+  if (!file) {
+    Serial.println("[gps-log] append failed");
+    return;
+  }
+
+  const float speed = gps.speedKmph();
+  const float course = gps.courseDeg();
+  file.print(millis());
+  file.print(',');
+  file.print(localDateTimeText());
+  file.print(',');
+  file.print(gps.latitude(), 6);
+  file.print(',');
+  file.print(gps.longitude(), 6);
+  file.print(',');
+  file.print(isnan(speed) ? String("") : String(speed, 1));
+  file.print(',');
+  file.print(isnan(course) ? String("") : String(course, 1));
+  file.print(',');
+  file.println(gps.satellites());
+  file.close();
+  Serial.printf("[gps-log] wrote %.6f,%.6f\n", gps.latitude(), gps.longitude());
+}
+
+void processGpsLogging() {
+  if (!settings.gpsLogging) return;
+  const uint32_t now = millis();
+  if (lastGpsLogMs != 0 && now - lastGpsLogMs < Config::GPS_LOG_INTERVAL_MS) return;
+  lastGpsLogMs = now;
+  appendGpsLogLine();
 }
 
 void startWiFi() {
@@ -302,6 +389,12 @@ void handleUiEvent(const UIEvent &event) {
       settingsStore.save(settings);
       Serial.printf("[settings] nightMode=%s\n", settings.nightMode ? "true" : "false");
       break;
+    case UIAction::ToggleGpsLogging:
+      settings.gpsLogging = !settings.gpsLogging;
+      settingsStore.save(settings);
+      lastGpsLogMs = 0;
+      Serial.printf("[settings] gpsLogging=%s\n", settings.gpsLogging ? "true" : "false");
+      break;
     case UIAction::LatPlus:
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);
       break;
@@ -442,6 +535,7 @@ void setup() {
 
   settingsStore.begin();
   settings = settingsStore.load();
+  initializeGpsLog();
   aircraft.reserve(Config::MAX_AIRCRAFT);
 
   display.begin(settings);
@@ -462,6 +556,7 @@ void loop() {
   }
 
   updateGpsPosition();
+  processGpsLogging();
   updateBatteryStatus();
   maintainWiFi();
   refreshAdsbIfDue();

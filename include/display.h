@@ -25,6 +25,7 @@ enum class UIAction : uint8_t {
   StartTouchCalibration,
   RangeNext,
   ToggleTheme,
+  ToggleGpsLogging,
   LatPlus,
   LatMinus,
   LonPlus,

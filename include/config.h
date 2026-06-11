@@ -31,6 +31,9 @@ constexpr int8_t GPS_RX = 39;
 constexpr int8_t GPS_TX = -1;
 constexpr uint32_t GPS_BAUD = 9600;
 constexpr uint32_t GPS_FIX_MAX_AGE_MS = 10000;
+constexpr const char *GPS_LOG_PATH = "/gps_log.csv";
+constexpr uint32_t GPS_LOG_INTERVAL_MS = 10000;
+constexpr size_t GPS_LOG_MAX_BYTES = 262144;
 
 constexpr uint8_t BATTERY_ADC_PIN = 34;
 // Board battery sense uses a 100k/100k divider, so IO34 reads half of BAT+.

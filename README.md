@@ -65,6 +65,9 @@ The radar header also shows battery voltage from the board's `IO34` ADC sense li
 - Aircraft type labels are parsed from ADS-B field `t` or `type` when provided by the API.
 - Alert banner shows aircraft within `ALERT_DISTANCE_KM` or below `ALERT_LOW_ALT_FT`.
 - GPS compass shows course-over-ground when the optional GPS has a valid course fix.
+- Optional GPS logging saves fixes to SPIFFS CSV at `/gps_log.csv`.
+
+GPS logging is controlled from `Setup` with the `Log On` / `Log Off` button. It is off by default, logs only valid GPS fixes, writes every `GPS_LOG_INTERVAL_MS`, and rotates the file at `GPS_LOG_MAX_BYTES`.
 
 ## Calibration
 
