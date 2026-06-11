@@ -70,6 +70,7 @@ Aircraft trails:
 
 - The radar keeps the last 20 known positions for each aircraft.
 - Trails are drawn behind the aircraft icon so movement direction is easier to see.
+- Aircraft outside the selected range, but within `EDGE_MARKER_RANGE_MULTIPLIER`, are drawn as red markers on the outer ring with distance labels.
 
 Airport overlays:
 

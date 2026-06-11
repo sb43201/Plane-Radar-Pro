@@ -63,6 +63,7 @@ constexpr uint32_t WIFI_RESET_HOLD_MS = 3000;
 constexpr uint32_t UI_CLOCK_MS = 1000;
 constexpr float ALERT_DISTANCE_KM = 2.0f;
 constexpr int32_t ALERT_LOW_ALT_FT = 3000;
+constexpr float EDGE_MARKER_RANGE_MULTIPLIER = 1.5f;
 constexpr size_t MAX_AIRCRAFT = 80;
 constexpr size_t TRAIL_POINTS = 20;
 constexpr size_t JSON_DOC_SIZE = 65536;

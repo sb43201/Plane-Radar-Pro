@@ -63,6 +63,7 @@ The radar header also shows battery voltage from the board's `IO34` ADC sense li
 - `Setup` includes a saved `Scope` / `Radar` toggle for the main map style.
 - Radar screen uses a dark circular scope layout with green rings, crosshairs, compass labels, range marker, and stacked aircraft labels.
 - Aircraft trails keep the last 20 positions per aircraft.
+- Aircraft just outside selected range appear as red edge markers up to `EDGE_MARKER_RANGE_MULTIPLIER`.
 - Airport overlays mark `IND`, `HUF`, and `MQJ` when they are inside the selected radar range.
 - Aircraft type labels are parsed from ADS-B field `t` or `type` when provided by the API.
 - Alert banner shows aircraft within `ALERT_DISTANCE_KM` or below `ALERT_LOW_ALT_FT`.

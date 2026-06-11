@@ -33,6 +33,22 @@ String aircraftSubtitle(const Aircraft &a) {
   return a.type.length() ? a.type : (a.category.length() ? a.category : String("---"));
 }
 
+void drawEdgeMarker(TFT_eSPI &tft, int16_t cx, int16_t cy, int16_t radius, float bearingDeg, float distanceKm,
+                    uint16_t bgColor) {
+  const float angle = bearingDeg * PI / 180.0f;
+  const int16_t x = cx + roundf(sinf(angle) * (radius - 2));
+  const int16_t y = cy - roundf(cosf(angle) * (radius - 2));
+  const int16_t tailX = cx + roundf(sinf(angle) * (radius - 12));
+  const int16_t tailY = cy - roundf(cosf(angle) * (radius - 12));
+  tft.fillCircle(x, y, 4, TFT_RED);
+  tft.drawLine(tailX, tailY, x, y, TFT_RED);
+  tft.setTextFont(1);
+  tft.setTextColor(TFT_RED, bgColor);
+  const int16_t labelX = x < cx ? x + 6 : x - 28;
+  const int16_t labelY = y < cy ? y + 5 : y - 13;
+  tft.drawString(String(distanceKm, 0) + "km", labelX, labelY);
+}
+
 struct AirportOverlay {
   const char *id;
   float lat;
@@ -227,7 +243,12 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
 
   for (const Aircraft &a : aircraft) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
-    if (!p.visible) continue;
+    if (!p.visible) {
+      if (p.distanceKm <= settings.rangeKm * Config::EDGE_MARKER_RANGE_MULTIPLIER) {
+        drawEdgeMarker(tft_, cx, cy, radius, p.bearingDeg, p.distanceKm, scopeBg);
+      }
+      continue;
+    }
     drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), selectedHex_ == a.hex);
     const int16_t labelX = p.x < cx ? p.x + 10 : p.x - 58;
     const int16_t labelY = p.y - 16;
