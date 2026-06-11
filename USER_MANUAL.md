@@ -74,8 +74,14 @@ Aircraft trails:
 
 Airport overlays:
 
-- The radar marks nearby airports when they fit inside the selected range.
-- Current overlays: `IND`, `HUF`, and `MQJ`.
+- Airport overlays are loaded from SD card `/airports.csv`.
+- The CSV format follows OurAirports columns.
+- The firmware reads the file line by line and keeps only airports within `150 km`.
+- The nearest `50` airports are kept in memory.
+- Airport markers are small blue circles.
+- Airport labels use this priority: IATA, GPS code, local code, ident.
+- Labels are drawn only inside the current radar range and selected label distance.
+- If the SD card or `airports.csv` is missing, Plane Radar Pro shows a warning but continues running.
 
 Aircraft type:
 
@@ -230,6 +236,8 @@ Settings screen:
 | Range Change | Cycle radar range |
 | Theme | Toggle day/night mode |
 | Scope / Radar | Toggle main radar display style |
+| Airport Overlay | Toggle airport markers |
+| Airport Label Distance | Cycle 10, 25, 50, 100, 150 km |
 | Cal Touch | Start four-point touchscreen calibration |
 | Log On / Log Off | Toggle GPS location logging |
 | Reset WiFi | Hold 3 seconds to reset WiFi |

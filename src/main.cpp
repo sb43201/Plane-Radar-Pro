@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "adsb.h"
+#include "airport_manager.h"
 #include "config.h"
 #include "display.h"
 #include "gps.h"
@@ -20,10 +21,12 @@ DisplayUI display;
 TouchInput touch;
 ADSBClient adsb;
 GPSModule gps;
+AirportManager airportManager;
 std::vector<Aircraft> aircraft;
 
 ScreenId currentScreen = ScreenId::Radar;
 String selectedHex;
+String selectedAirportCode;
 String wifiStatus = "boot";
 String lastUpdateText = "No update";
 uint32_t lastAdsbMs = 0;
@@ -46,6 +49,7 @@ bool calibrationWaitingForRelease = false;
 
 void updateAircraftAlerts();
 void processGpsLogging();
+void updateAirports(bool force = false);
 
 void markWifiPortalSaved() {
   wifiPortalSaved = true;
@@ -111,6 +115,10 @@ void updateBatteryStatus(bool force = false) {
     display.invalidate();
     Serial.printf("[battery] adc=%lu mV battery=%.2f V\n", millivolts, batteryVolts);
   }
+}
+
+const Airport *selectedAirport() {
+  return airportManager.findByCode(selectedAirportCode);
 }
 
 void initializeGpsLog() {
@@ -338,8 +346,15 @@ void updateGpsPosition() {
     settings.homeLat = lat;
     settings.homeLon = lon;
     lastAdsbMs = 0;
+    updateAirports(true);
     display.invalidate();
     Serial.printf("[gps] using GPS home position %.6f, %.6f\n", settings.homeLat, settings.homeLon);
+  }
+}
+
+void updateAirports(bool force) {
+  if (airportManager.refreshIfDue(settings.homeLat, settings.homeLon, force)) {
+    display.invalidate();
   }
 }
 
@@ -367,12 +382,19 @@ void handleUiEvent(const UIEvent &event) {
     case UIAction::ShowList:
       currentScreen = ScreenId::AircraftList;
       break;
+    case UIAction::ShowAirportList:
+      currentScreen = ScreenId::AirportList;
+      break;
     case UIAction::ShowSettings:
       currentScreen = ScreenId::Settings;
       break;
     case UIAction::ShowDetail:
       selectedHex = event.aircraftHex;
       currentScreen = ScreenId::Detail;
+      break;
+    case UIAction::ShowAirportDetail:
+      selectedAirportCode = event.airportCode;
+      currentScreen = ScreenId::AirportDetail;
       break;
     case UIAction::StartTouchCalibration:
       currentScreen = ScreenId::TouchCalibration;
@@ -400,6 +422,24 @@ void handleUiEvent(const UIEvent &event) {
       settingsStore.save(settings);
       Serial.printf("[settings] radarMode=%s\n", settings.scopeMode ? "scope" : "radar");
       break;
+    case UIAction::ToggleAirportOverlay:
+      settings.airportOverlay = !settings.airportOverlay;
+      settingsStore.save(settings);
+      Serial.printf("[settings] airportOverlay=%s\n", settings.airportOverlay ? "true" : "false");
+      break;
+    case UIAction::AirportLabelNext: {
+      size_t index = 0;
+      for (size_t i = 0; i < Config::AIRPORT_LABEL_OPTION_COUNT; ++i) {
+        if (settings.airportLabelKm == Config::AIRPORT_LABEL_OPTIONS[i]) {
+          index = i;
+          break;
+        }
+      }
+      settings.airportLabelKm = Config::AIRPORT_LABEL_OPTIONS[(index + 1) % Config::AIRPORT_LABEL_OPTION_COUNT];
+      settingsStore.save(settings);
+      Serial.printf("[settings] airportLabelKm=%u\n", settings.airportLabelKm);
+      break;
+    }
     case UIAction::LatPlus:
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);
       break;
@@ -513,13 +553,19 @@ void drawCurrentScreen(bool force = false) {
   switch (currentScreen) {
     case ScreenId::Radar:
       display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, gpsCompassStatus, batteryStatus, timeText, lastUpdateText,
-                        alertStatus, force);
+                        alertStatus, airportManager.airports(), airportManager.statusText(), force);
       break;
     case ScreenId::AircraftList:
       display.drawAircraftList(settings, aircraft, force);
       break;
+    case ScreenId::AirportList:
+      display.drawAirportList(settings, airportManager.airports(), force);
+      break;
     case ScreenId::Detail:
       display.drawAircraftDetail(settings, selectedAircraft(), force);
+      break;
+    case ScreenId::AirportDetail:
+      display.drawAirportDetail(settings, selectedAirport(), force);
       break;
     case ScreenId::Settings:
       display.drawSettings(settings, force);
@@ -544,6 +590,8 @@ void setup() {
   aircraft.reserve(Config::MAX_AIRCRAFT);
 
   display.begin(settings);
+  airportManager.begin();
+  airportManager.loadNearby(settings.homeLat, settings.homeLon);
   touch.begin(settings);
   gps.begin();
   updateBatteryStatus(true);
@@ -561,13 +609,14 @@ void loop() {
   }
 
   updateGpsPosition();
+  updateAirports();
   processGpsLogging();
   updateBatteryStatus();
   maintainWiFi();
   refreshAdsbIfDue();
 
   TouchPoint point = touch.read(settings);
-  UIEvent event = display.handleTouch(point, currentScreen, settings, aircraft);
+  UIEvent event = display.handleTouch(point, currentScreen, settings, aircraft, airportManager.airports());
   processResetWiFiHold(event);
   handleUiEvent(event);
 

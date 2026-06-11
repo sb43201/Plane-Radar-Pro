@@ -64,13 +64,30 @@ The radar header also shows battery voltage from the board's `IO34` ADC sense li
 - Radar screen uses a dark circular scope layout with green rings, crosshairs, compass labels, range marker, and stacked aircraft labels.
 - Aircraft trails keep the last 20 positions per aircraft.
 - Aircraft just outside selected range appear as red edge markers up to `EDGE_MARKER_RANGE_MULTIPLIER`.
-- Airport overlays mark `IND`, `HUF`, and `MQJ` when they are inside the selected radar range.
+- Airport overlays are loaded from SD card `/airports.csv` using an OurAirports-compatible CSV format.
+- Airport markers are small blue circles; labels use IATA, GPS code, local code, then ident.
 - Aircraft type labels are parsed from ADS-B field `t` or `type` when provided by the API.
 - Alert banner shows aircraft within `ALERT_DISTANCE_KM` or below `ALERT_LOW_ALT_FT`.
 - GPS compass shows course-over-ground when the optional GPS has a valid course fix.
 - Optional GPS logging saves fixes to SPIFFS CSV at `/gps_log.csv`.
 
 GPS logging is controlled from `Setup` with the `Log On` / `Log Off` button. It is off by default, logs only valid GPS fixes, writes every `GPS_LOG_INTERVAL_MS`, and rotates the file at `GPS_LOG_MAX_BYTES`.
+
+## Airport CSV
+
+Copy `airports.csv` to the root of a FAT32 SD card as:
+
+```text
+/airports.csv
+```
+
+Expected columns:
+
+```text
+ident,type,name,latitude_deg,longitude_deg,elevation_ft,continent,iso_country,iso_region,municipality,gps_code,iata_code,local_code
+```
+
+Only airports within `150 km` of the current GPS/home position are retained, and only the nearest `50` are kept in memory.
 
 ## Calibration
 

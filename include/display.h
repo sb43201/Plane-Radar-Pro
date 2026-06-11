@@ -5,13 +5,16 @@
 #include <vector>
 
 #include "adsb.h"
+#include "airport_manager.h"
 #include "settings.h"
 #include "touch.h"
 
 enum class ScreenId : uint8_t {
   Radar,
   AircraftList,
+  AirportList,
   Detail,
+  AirportDetail,
   Settings,
   TouchCalibration
 };
@@ -20,13 +23,17 @@ enum class UIAction : uint8_t {
   None,
   ShowRadar,
   ShowList,
+  ShowAirportList,
   ShowSettings,
   ShowDetail,
+  ShowAirportDetail,
   StartTouchCalibration,
   RangeNext,
   ToggleTheme,
   ToggleGpsLogging,
   ToggleRadarMode,
+  ToggleAirportOverlay,
+  AirportLabelNext,
   LatPlus,
   LatMinus,
   LonPlus,
@@ -38,6 +45,7 @@ enum class UIAction : uint8_t {
 struct UIEvent {
   UIAction action = UIAction::None;
   String aircraftHex;
+  String airportCode;
 };
 
 class DisplayUI {
@@ -46,20 +54,24 @@ class DisplayUI {
   void showSplash();
   void drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft, const String &wifiStatus,
                  const String &gpsStatus, const String &gpsCompass, const String &batteryStatus, const String &timeText,
-                 const String &lastUpdateText, const String &alertText, bool force = false);
+                 const String &lastUpdateText, const String &alertText, const std::vector<Airport> &airports,
+                 const String &airportStatus, bool force = false);
   void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force = false);
   void drawAircraftDetail(const AppSettings &settings, const Aircraft *aircraft, bool force = false);
+  void drawAirportList(const AppSettings &settings, const std::vector<Airport> &airports, bool force = false);
+  void drawAirportDetail(const AppSettings &settings, const Airport *airport, bool force = false);
   void drawSettings(const AppSettings &settings, bool force = false);
   void drawTouchCalibration(const AppSettings &settings, uint8_t step, bool complete = false);
   void drawWiFiSetup(const AppSettings &settings, const String &savedSsid, const String &status);
   UIEvent handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
-                      const std::vector<Aircraft> &aircraft);
+                      const std::vector<Aircraft> &aircraft, const std::vector<Airport> &airports);
   void invalidate();
 
  private:
   TFT_eSPI tft_;
   bool dirty_ = true;
   String selectedHex_;
+  String selectedAirportCode_;
 
   uint16_t bg(const AppSettings &settings) const;
   uint16_t fg(const AppSettings &settings) const;
@@ -74,4 +86,5 @@ class DisplayUI {
   void drawBottomNav(const AppSettings &settings, ScreenId active);
   const Aircraft *findAircraft(const std::vector<Aircraft> &aircraft, const String &hex) const;
   String hitAircraft(int16_t x, int16_t y, const AppSettings &settings, const std::vector<Aircraft> &aircraft);
+  String hitAirportRow(int16_t x, int16_t y, const std::vector<Airport> &airports);
 };

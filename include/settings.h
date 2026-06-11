@@ -17,6 +17,8 @@ struct AppSettings {
   int touchMaxY = Config::TOUCH_MAX_Y;
   bool gpsLogging = false;
   bool scopeMode = true;
+  bool airportOverlay = true;
+  uint16_t airportLabelKm = 50;
 };
 
 class SettingsStore {

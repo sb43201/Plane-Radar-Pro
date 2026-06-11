@@ -25,6 +25,13 @@ constexpr uint8_t SD_CS = 5;
 constexpr uint8_t SD_SCK = 18;
 constexpr uint8_t SD_MOSI = 23;
 constexpr uint8_t SD_MISO = 19;
+constexpr const char *AIRPORT_CSV_PATH = "/airports.csv";
+constexpr float AIRPORT_LOAD_RADIUS_KM = 150.0f;
+constexpr size_t AIRPORT_MAX_RETAINED = 50;
+constexpr uint32_t AIRPORT_REFRESH_MS = 30000;
+constexpr float AIRPORT_RELOAD_MOVE_KM = 0.5f;
+constexpr uint16_t AIRPORT_LABEL_OPTIONS[] = {10, 25, 50, 100, 150};
+constexpr size_t AIRPORT_LABEL_OPTION_COUNT = sizeof(AIRPORT_LABEL_OPTIONS) / sizeof(AIRPORT_LABEL_OPTIONS[0]);
 
 constexpr bool GPS_ENABLED = true;
 constexpr int8_t GPS_RX = 39;
