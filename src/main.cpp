@@ -26,11 +26,16 @@ String lastUpdateText = "No update";
 uint32_t lastAdsbMs = 0;
 uint32_t lastReconnectMs = 0;
 uint32_t lastClockMs = 0;
+uint32_t lastBatteryMs = 0;
 bool timeConfigured = false;
 bool wifiPortalSaved = false;
 uint32_t resetWiFiHoldStartMs = 0;
 uint32_t resetWiFiLastTouchMs = 0;
 String gpsStatus = "No GPS";
+String batteryStatus = "Bat --";
+RawTouchPoint calibrationPoints[4];
+uint8_t calibrationStep = 0;
+bool calibrationWaitingForRelease = false;
 
 void markWifiPortalSaved() {
   wifiPortalSaved = true;
@@ -57,6 +62,26 @@ void configureTimeIfNeeded() {
   configTzTime("EST5EDT,M3.2.0,M11.1.0", "pool.ntp.org", "time.nist.gov");
   timeConfigured = true;
   Serial.println("[time] NTP configured");
+}
+
+void updateBatteryStatus(bool force = false) {
+  const uint32_t now = millis();
+  if (!force && now - lastBatteryMs < Config::BATTERY_REFRESH_MS) return;
+  lastBatteryMs = now;
+
+  uint32_t millivolts = 0;
+  for (uint16_t i = 0; i < Config::BATTERY_ADC_SAMPLES; ++i) {
+    millivolts += analogReadMilliVolts(Config::BATTERY_ADC_PIN);
+  }
+  millivolts /= Config::BATTERY_ADC_SAMPLES;
+
+  const float batteryVolts = (millivolts / 1000.0f) * Config::BATTERY_ADC_DIVIDER;
+  String newStatus = "Bat " + String(batteryVolts, 2) + "V";
+  if (newStatus != batteryStatus) {
+    batteryStatus = newStatus;
+    display.invalidate();
+    Serial.printf("[battery] adc=%lu mV battery=%.2f V\n", millivolts, batteryVolts);
+  }
 }
 
 void startWiFi() {
@@ -198,6 +223,13 @@ void handleUiEvent(const UIEvent &event) {
       selectedHex = event.aircraftHex;
       currentScreen = ScreenId::Detail;
       break;
+    case UIAction::StartTouchCalibration:
+      currentScreen = ScreenId::TouchCalibration;
+      calibrationStep = 0;
+      calibrationWaitingForRelease = false;
+      display.drawTouchCalibration(settings, calibrationStep, false);
+      Serial.println("[touch-cal] calibration started");
+      return;
     case UIAction::RangeNext:
       cycleRange();
       break;
@@ -229,6 +261,60 @@ void handleUiEvent(const UIEvent &event) {
       break;
   }
   display.invalidate();
+}
+
+void finishTouchCalibration() {
+  const int leftX = ((int)calibrationPoints[0].x + calibrationPoints[3].x) / 2;
+  const int rightX = ((int)calibrationPoints[1].x + calibrationPoints[2].x) / 2;
+  const int topY = ((int)calibrationPoints[0].y + calibrationPoints[1].y) / 2;
+  const int bottomY = ((int)calibrationPoints[2].y + calibrationPoints[3].y) / 2;
+
+  if (abs(rightX - leftX) < 300 || abs(bottomY - topY) < 300) {
+    Serial.println("[touch-cal] rejected calibration: points too close");
+    currentScreen = ScreenId::Settings;
+    display.invalidate();
+    return;
+  }
+
+  settings.touchMinX = leftX < rightX ? min((int)calibrationPoints[0].x, (int)calibrationPoints[3].x)
+                                      : max((int)calibrationPoints[0].x, (int)calibrationPoints[3].x);
+  settings.touchMaxX = leftX < rightX ? max((int)calibrationPoints[1].x, (int)calibrationPoints[2].x)
+                                      : min((int)calibrationPoints[1].x, (int)calibrationPoints[2].x);
+  settings.touchMinY = topY < bottomY ? min((int)calibrationPoints[0].y, (int)calibrationPoints[1].y)
+                                      : max((int)calibrationPoints[0].y, (int)calibrationPoints[1].y);
+  settings.touchMaxY = topY < bottomY ? max((int)calibrationPoints[2].y, (int)calibrationPoints[3].y)
+                                      : min((int)calibrationPoints[2].y, (int)calibrationPoints[3].y);
+  settingsStore.save(settings);
+  Serial.printf("[touch-cal] saved x=(%d,%d) y=(%d,%d)\n", settings.touchMinX, settings.touchMaxX,
+                settings.touchMinY, settings.touchMaxY);
+  display.drawTouchCalibration(settings, calibrationStep, true);
+  delay(900);
+  currentScreen = ScreenId::Settings;
+  display.invalidate();
+}
+
+void processTouchCalibration() {
+  if (currentScreen != ScreenId::TouchCalibration) return;
+
+  if (calibrationWaitingForRelease) {
+    if (!touch.isTouched()) {
+      calibrationWaitingForRelease = false;
+      if (calibrationStep >= 4) {
+        finishTouchCalibration();
+      } else {
+        display.drawTouchCalibration(settings, calibrationStep, false);
+      }
+    }
+    return;
+  }
+
+  RawTouchPoint raw = touch.readRaw();
+  if (!raw.touched) return;
+
+  calibrationPoints[calibrationStep] = raw;
+  Serial.printf("[touch-cal] point %u raw=(%d,%d,%d)\n", calibrationStep + 1, raw.x, raw.y, raw.z);
+  calibrationStep++;
+  calibrationWaitingForRelease = true;
 }
 
 void resetWiFiAndRestart() {
@@ -264,7 +350,7 @@ void drawCurrentScreen(bool force = false) {
   const String timeText = localTimeText();
   switch (currentScreen) {
     case ScreenId::Radar:
-      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, timeText, lastUpdateText, force);
+      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, batteryStatus, timeText, lastUpdateText, force);
       break;
     case ScreenId::AircraftList:
       display.drawAircraftList(settings, aircraft, force);
@@ -275,6 +361,9 @@ void drawCurrentScreen(bool force = false) {
     case ScreenId::Settings:
       display.drawSettings(settings, force);
       break;
+    case ScreenId::TouchCalibration:
+      display.drawTouchCalibration(settings, calibrationStep, false);
+      break;
   }
 }
 
@@ -283,6 +372,8 @@ void setup() {
   delay(100);
   Serial.println();
   Serial.println("[boot] Plane Radar Pro starting");
+  analogReadResolution(12);
+  analogSetPinAttenuation(Config::BATTERY_ADC_PIN, ADC_11db);
 
   settingsStore.begin();
   settings = settingsStore.load();
@@ -291,6 +382,7 @@ void setup() {
   display.begin(settings);
   touch.begin(settings);
   gps.begin();
+  updateBatteryStatus(true);
   display.showSplash();
 
   startWiFi();
@@ -299,7 +391,13 @@ void setup() {
 }
 
 void loop() {
+  processTouchCalibration();
+  if (currentScreen == ScreenId::TouchCalibration) {
+    return;
+  }
+
   updateGpsPosition();
+  updateBatteryStatus();
   maintainWiFi();
   refreshAdsbIfDue();
 

@@ -4,7 +4,7 @@
 
 TouchInput::TouchInput()
     : touchSpi_(HSPI),
-      touch_(Config::TOUCH_CS_PIN) {}
+      touch_(Config::TOUCH_CS_PIN, Config::TOUCH_IRQ_PIN) {}
 
 void TouchInput::begin(const AppSettings &) {
   touchSpi_.begin(Config::TOUCH_SCK, Config::TOUCH_MISO, Config::TOUCH_MOSI, Config::TOUCH_CS_PIN);
@@ -28,6 +28,23 @@ TouchPoint TouchInput::read(const AppSettings &settings) {
   point.y = constrain(y, 0, Config::SCREEN_H - 1);
   point.touched = true;
   Serial.printf("[touch] raw=(%d,%d,%d) mapped=(%d,%d)\n", raw.x, raw.y, raw.z, point.x, point.y);
+  return point;
+}
+
+RawTouchPoint TouchInput::readRaw() {
+  RawTouchPoint point;
+  if (!touch_.touched()) return point;
+
+  const uint32_t now = millis();
+  if (now - lastTouchMs_ < 220) return point;
+  lastTouchMs_ = now;
+
+  TS_Point raw = touch_.getPoint();
+  point.x = raw.x;
+  point.y = raw.y;
+  point.z = raw.z;
+  point.touched = true;
+  Serial.printf("[touch-cal] raw=(%d,%d,%d)\n", point.x, point.y, point.z);
   return point;
 }
 

@@ -131,12 +131,12 @@ void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
 }
 
 void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft,
-                          const String &wifiStatus, const String &gpsStatus, const String &timeText,
-                          const String &lastUpdateText, bool force) {
+                          const String &wifiStatus, const String &gpsStatus, const String &batteryStatus,
+                          const String &timeText, const String &lastUpdateText, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
-  header(settings, Config::APP_NAME, timeText);
+  header(settings, Config::APP_NAME, timeText + "  " + batteryStatus);
 
   const int16_t cx = tft_.width() / 2;
   const int16_t cy = 170;
@@ -277,6 +277,38 @@ void DisplayUI::drawWiFiSetup(const AppSettings &settings, const String &savedSs
   tft_.setTextDatum(TL_DATUM);
 }
 
+void DisplayUI::drawTouchCalibration(const AppSettings &settings, uint8_t step, bool complete) {
+  dirty_ = false;
+  tft_.fillScreen(bg(settings));
+  header(settings, "Touch Calibration", complete ? "Saved" : "Tap target");
+
+  tft_.setTextDatum(MC_DATUM);
+  tft_.setTextFont(2);
+  tft_.setTextColor(fg(settings), bg(settings));
+  if (complete) {
+    tft_.drawString("Calibration saved", tft_.width() / 2, 120);
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.drawString("Returning to setup...", tft_.width() / 2, 160);
+    tft_.setTextDatum(TL_DATUM);
+    return;
+  }
+
+  const int16_t margin = 28;
+  const int16_t right = (int16_t)(tft_.width() - margin);
+  const int16_t bottom = (int16_t)(tft_.height() - margin);
+  const int16_t xs[] = {margin, right, right, margin};
+  const int16_t ys[] = {(int16_t)(margin + 32), (int16_t)(margin + 32), bottom, bottom};
+  const uint8_t index = step < 4 ? step : 3;
+  tft_.drawString("Tap and release each crosshair", tft_.width() / 2, tft_.height() / 2 - 12);
+  tft_.setTextColor(muted(settings), bg(settings));
+  tft_.drawString("Point " + String(index + 1) + " of 4", tft_.width() / 2, tft_.height() / 2 + 18);
+
+  tft_.drawCircle(xs[index], ys[index], 16, accent(settings));
+  tft_.drawLine(xs[index] - 22, ys[index], xs[index] + 22, ys[index], accent(settings));
+  tft_.drawLine(xs[index], ys[index] - 22, xs[index], ys[index] + 22, accent(settings));
+  tft_.setTextDatum(TL_DATUM);
+}
+
 void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
@@ -300,6 +332,7 @@ void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
 
   tft_.drawString("Theme", 34, 202);
   button(170, 194, 122, 30, settings.nightMode ? "Night" : "Day", accent(settings), TFT_WHITE);
+  button(328, 194, 122, 30, "Cal Touch", accent(settings), TFT_WHITE);
   button(34, 242, 122, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
   tft_.setTextColor(muted(settings), bg(settings));
   tft_.drawString("Hold 3 sec", 170, 250);
@@ -369,6 +402,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inRect(point.x, point.y, 394, 98, 56, 30)) event.action = UIAction::LonPlus;
     else if (inRect(point.x, point.y, 328, 146, 122, 30)) event.action = UIAction::RangeNext;
     else if (inRect(point.x, point.y, 170, 194, 122, 30)) event.action = UIAction::ToggleTheme;
+    else if (inRect(point.x, point.y, 328, 194, 122, 30)) event.action = UIAction::StartTouchCalibration;
     else if (inRect(point.x, point.y, 34, 242, 122, 30)) event.action = UIAction::ResetWiFiHold;
     else if (inRect(point.x, point.y, 328, 242, 122, 30)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;

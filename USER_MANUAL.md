@@ -8,7 +8,7 @@ Supported target:
 
 - ESP32-WROOM-32E 3.5-inch ST7796 touchscreen board
 - XPT2046 resistive touch controller
-- Optional UART GPS module such as NEO-6M / GY-GPS6MV2
+- Optional NMEA GPS receiver module such as NEO-6M / GY-GPS6MV2
 
 Board pinout used by this firmware:
 
@@ -21,30 +21,51 @@ Board pinout used by this firmware:
 | LCD MISO | GPIO12 |
 | LCD Backlight | GPIO27 |
 | Touch CS | GPIO33 |
+| Touch IRQ | GPIO36 |
+| Touch SCK | GPIO14 |
+| Touch MOSI | GPIO13 |
+| Touch MISO | GPIO12 |
+| Battery voltage ADC | GPIO34 |
+| GPS data input | Expand input connector IO39 |
 | SD CS | GPIO5 |
 | SD SCK | GPIO18 |
 | SD MISO | GPIO19 |
 | SD MOSI | GPIO23 |
 
+This pinout follows the vendor specification plus the Arduino, MicroPython, and ESP-IDF demo code. The uploaded schematic labels appear inconsistent with those sources, so the firmware uses the spec/demo-code wiring.
+
 ## Optional GPS Wiring
 
-The GPS module is optional. Without it, Plane Radar Pro uses the saved/manual home latitude and longitude.
+The GPS module is optional. Without it, Plane Radar Pro uses the saved/manual home latitude and longitude. Use the board's 2-pin expand input connector, not the `IO3` / `IO1` serial-port connector.
 
 | GPS module pin | ESP32 connection |
 | --- | --- |
 | VCC | 3.3V or 5V, depending on your module rating |
 | GND | GND |
-| TX | GPIO16 |
-| RX | GPIO17, optional |
+| TX | 2-pin expand input connector `IO39` |
+| RX | Leave unconnected |
 
-Default GPS serial settings:
+Default GPS data settings:
 
-- UART: UART2
+- Data input pin: GPIO39
 - Baud: 9600
-- RX: GPIO16
-- TX: GPIO17
+- ESP32 output to GPS: disabled (`GPS_TX = -1`)
+
+The expand input connector exposes `IO35` and `IO39`; both are input-only pins, which is fine because GPS only needs to send NMEA data to the ESP32. The firmware default uses `IO39`. If your connector wiring is easier on `IO35`, change `GPS_RX` to `35` in `include/config.h`.
 
 When GPS has a fresh fix, the radar automatically uses the GPS latitude and longitude as the home position. The top bar shows GPS status such as `No GPS`, `No fix`, or `Fix 8 sat`.
+
+## Battery Voltage
+
+Plane Radar Pro reads the board battery voltage sense line on `IO34` and shows it in the radar header as `Bat x.xxV`. The schematic shows BAT+ feeding `BAT_ADC` through a 100k/100k divider, so the ESP32 ADC sees half of the actual battery voltage.
+
+The default voltage divider scale is:
+
+```cpp
+BATTERY_ADC_DIVIDER = 2.0f
+```
+
+If the displayed voltage is different from a multimeter reading, adjust `BATTERY_ADC_DIVIDER` in `include/config.h`, rebuild, and upload.
 
 ## Build And Upload
 
@@ -114,6 +135,7 @@ The radar screen shows:
 - Aircraft count
 - WiFi status
 - GPS status
+- Battery voltage
 - Selected range
 - Last update or error status
 - Radar rings
@@ -151,8 +173,22 @@ Settings screen:
 | Longitude +/- | Adjust manual home longitude |
 | Range Change | Cycle radar range |
 | Theme | Toggle day/night mode |
+| Cal Touch | Start four-point touchscreen calibration |
 | Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
+
+## Touchscreen Calibration
+
+Touch calibration is built into the firmware.
+
+1. Tap `Setup`.
+2. Tap `Cal Touch`.
+3. Tap each crosshair as it appears.
+4. Release your finger between each tap.
+5. After four points, calibration is saved to ESP32 flash/NVS.
+6. The app returns to the Setup screen.
+
+Calibration is preserved after reboot. If the result is poor, run `Cal Touch` again.
 
 ## WiFi Status
 
@@ -181,7 +217,7 @@ If touch is offset:
 
 If GPS shows `No GPS`:
 
-- Confirm GPS TX is wired to ESP32 GPIO16.
+- Confirm GPS TX is wired to the 2-pin expand input connector `IO39`, or to the pin configured as `GPS_RX`.
 - Confirm GPS GND is connected to ESP32 GND.
 - Move the antenna near a window or outdoors.
 - Wait several minutes for first fix.

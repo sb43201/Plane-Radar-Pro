@@ -12,7 +12,8 @@ enum class ScreenId : uint8_t {
   Radar,
   AircraftList,
   Detail,
-  Settings
+  Settings,
+  TouchCalibration
 };
 
 enum class UIAction : uint8_t {
@@ -21,6 +22,7 @@ enum class UIAction : uint8_t {
   ShowList,
   ShowSettings,
   ShowDetail,
+  StartTouchCalibration,
   RangeNext,
   ToggleTheme,
   LatPlus,
@@ -41,10 +43,12 @@ class DisplayUI {
   void begin(const AppSettings &settings);
   void showSplash();
   void drawRadar(const AppSettings &settings, const std::vector<Aircraft> &aircraft, const String &wifiStatus,
-                 const String &gpsStatus, const String &timeText, const String &lastUpdateText, bool force = false);
+                 const String &gpsStatus, const String &batteryStatus, const String &timeText,
+                 const String &lastUpdateText, bool force = false);
   void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force = false);
   void drawAircraftDetail(const AppSettings &settings, const Aircraft *aircraft, bool force = false);
   void drawSettings(const AppSettings &settings, bool force = false);
+  void drawTouchCalibration(const AppSettings &settings, uint8_t step, bool complete = false);
   void drawWiFiSetup(const AppSettings &settings, const String &savedSsid, const String &status);
   UIEvent handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
                       const std::vector<Aircraft> &aircraft);

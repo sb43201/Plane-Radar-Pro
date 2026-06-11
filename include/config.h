@@ -16,7 +16,7 @@ constexpr uint8_t LCD_MISO = 12;
 constexpr uint8_t LCD_BL = 27;
 
 constexpr uint8_t TOUCH_CS_PIN = 33;
-constexpr uint8_t TOUCH_IRQ_PIN = 255;
+constexpr uint8_t TOUCH_IRQ_PIN = 36;
 constexpr uint8_t TOUCH_MOSI = LCD_MOSI;
 constexpr uint8_t TOUCH_MISO = LCD_MISO;
 constexpr uint8_t TOUCH_SCK = LCD_SCK;
@@ -27,10 +27,16 @@ constexpr uint8_t SD_MOSI = 23;
 constexpr uint8_t SD_MISO = 19;
 
 constexpr bool GPS_ENABLED = true;
-constexpr uint8_t GPS_RX = 16;
-constexpr uint8_t GPS_TX = 17;
+constexpr int8_t GPS_RX = 39;
+constexpr int8_t GPS_TX = -1;
 constexpr uint32_t GPS_BAUD = 9600;
 constexpr uint32_t GPS_FIX_MAX_AGE_MS = 10000;
+
+constexpr uint8_t BATTERY_ADC_PIN = 34;
+// Board battery sense uses a 100k/100k divider, so IO34 reads half of BAT+.
+constexpr float BATTERY_ADC_DIVIDER = 2.0f;
+constexpr uint16_t BATTERY_ADC_SAMPLES = 16;
+constexpr uint32_t BATTERY_REFRESH_MS = 2000;
 
 constexpr uint16_t SCREEN_W = 480;
 constexpr uint16_t SCREEN_H = 320;

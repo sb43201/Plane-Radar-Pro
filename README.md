@@ -30,27 +30,38 @@ LCD:
 Touch:
 
 - CS GPIO33
-- IRQ not connected in the vendor demo
-- Touch shares LCD SPI: SCK GPIO14, MOSI GPIO13, MISO GPIO12
+- SCK GPIO14
+- MOSI GPIO13
+- MISO GPIO12
+- IRQ GPIO36
 
-SD pins are reserved in `include/config.h` but not used by the current firmware.
+Battery:
+
+- Battery voltage ADC sense GPIO34
+- Voltage scale is `BATTERY_ADC_DIVIDER = 2.0f` for the onboard 100k/100k BAT+ divider
+
+This pinout follows the vendor specification plus the Arduino, MicroPython, and ESP-IDF demo code. The uploaded schematic labels appear inconsistent with those sources. SD pins are reserved in `include/config.h` but not used by the current firmware.
 
 Optional GPS:
 
-- Module type: NEO-6M/GY-GPS6MV2 style UART GPS
+- Module type: NEO-6M/GY-GPS6MV2 style NMEA GPS receiver
 - GPS VCC to board 3.3V or 5V according to your module rating
 - GPS GND to GND
-- GPS TX to ESP32 GPIO16 (`GPS_RX`)
-- GPS RX to ESP32 GPIO17 (`GPS_TX`, optional)
+- GPS TX to the board expand input connector pin `IO39` (`GPS_RX`)
+- GPS RX may be left unconnected (`GPS_TX = -1`)
 - Default baud: 9600
+
+Use the 2-pin expand input connector, not the board's `IO3`/`IO1` serial port. The expand input connector exposes `IO35` and `IO39`; both are input-only pins, which is fine because GPS only needs to send NMEA data to the ESP32. The firmware default uses `IO39`.
 
 If GPS is connected and has a fresh fix, Plane Radar Pro automatically uses the GPS latitude/longitude as the radar home position. Without a GPS fix, it keeps using the saved/manual home coordinates.
 
+The radar header also shows battery voltage from the board's `IO34` ADC sense line. The schematic shows a 100k/100k BAT+ divider, so the firmware multiplies the ADC reading by 2.0. If the displayed voltage does not match a multimeter reading, tune `BATTERY_ADC_DIVIDER` in `include/config.h`.
+
 ## Calibration
 
-Display rotation and touch calibration defaults live in `include/config.h` and are persisted after boot through `SettingsStore`.
+Touch calibration is available on the device: tap `Setup`, then `Cal Touch`, then tap the four crosshairs. Calibration is saved to ESP32 Preferences/NVS.
 
-If touches appear mirrored or offset for your board variant, adjust:
+Display rotation and touch calibration defaults live in `include/config.h`. If the touchscreen cannot be used well enough to reach `Cal Touch`, adjust these fallback constants and upload again:
 
 - `TOUCH_MIN_X`
 - `TOUCH_MAX_X`

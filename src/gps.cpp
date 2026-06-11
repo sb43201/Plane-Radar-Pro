@@ -9,7 +9,7 @@ HardwareSerial gpsSerial(2);
 void GPSModule::begin() {
   if (!Config::GPS_ENABLED) return;
   gpsSerial.begin(Config::GPS_BAUD, SERIAL_8N1, Config::GPS_RX, Config::GPS_TX);
-  Serial.printf("[gps] optional GPS enabled on RX=%u TX=%u baud=%lu\n", Config::GPS_RX, Config::GPS_TX,
+  Serial.printf("[gps] optional GPS enabled on RX=%d TX=%d baud=%lu\n", Config::GPS_RX, Config::GPS_TX,
                 Config::GPS_BAUD);
 }
 
