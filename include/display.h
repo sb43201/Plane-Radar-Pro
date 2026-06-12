@@ -93,6 +93,7 @@ class DisplayUI {
   bool dirty_ = true;
   String selectedHex_;
   String selectedAirportCode_;
+  uint8_t airportListOffset_ = 0;
 
   uint16_t bg(const AppSettings &settings) const;
   uint16_t fg(const AppSettings &settings) const;
@@ -108,5 +109,6 @@ class DisplayUI {
   const Aircraft *findAircraft(const std::vector<Aircraft> &aircraft, const String &hex) const;
   String hitAircraft(int16_t x, int16_t y, const AppSettings &settings, const std::vector<Aircraft> &aircraft);
   String hitAirportRow(int16_t x, int16_t y, const AppSettings &settings, const std::vector<Airport> &airports);
+  uint8_t airportInRangeCount(const AppSettings &settings, const std::vector<Airport> &airports) const;
   int hitWifiRow(int16_t x, int16_t y, const WiFiManagerExt &wifi);
 };
