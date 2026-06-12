@@ -348,18 +348,8 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     tft_.drawString(altText(a.altBaro), labelX, labelY + 18);
   }
 
-  if (alertText.length()) {
-    const uint16_t fill = 0xA000;
-    tft_.fillRoundRect(46, 52, tft_.width() - 92, 20, 4, fill);
-    tft_.setTextColor(TFT_WHITE, fill);
-    tft_.setTextDatum(MC_DATUM);
-    tft_.setTextFont(1);
-    tft_.drawString(alertText, tft_.width() / 2, 62);
-    tft_.setTextDatum(TL_DATUM);
-  }
-
   if (gpsCompass.length()) {
-    const int16_t compassY = alertText.length() ? 76 : 52;
+    const int16_t compassY = 52;
     const int16_t compassX = tft_.width() - 92;
     const uint16_t compassFill = settings.scopeMode ? 0x0841 : panel(settings);
     tft_.fillRoundRect(compassX, compassY, 86, 20, 4, compassFill);
@@ -379,7 +369,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
 
   const int16_t statsY = cy + radius + 18;
   const uint16_t statFill = settings.scopeMode ? 0x0841 : panel(settings);
-  tft_.fillRoundRect(10, statsY, tft_.width() - 20, 72, 6, statFill);
+  tft_.fillRoundRect(10, statsY, tft_.width() - 20, 92, 6, statFill);
   tft_.setTextDatum(MC_DATUM);
   tft_.setTextFont(4);
   tft_.setTextColor(text, statFill);
@@ -390,6 +380,13 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   if (nearestAirportText.length()) {
     tft_.setTextFont(1);
     tft_.drawString(nearestAirportText, tft_.width() / 2, statsY + 62);
+  }
+  if (alertText.length()) {
+    const uint16_t alertFill = 0xA000;
+    tft_.fillRoundRect(18, statsY + 72, tft_.width() - 36, 16, 4, alertFill);
+    tft_.setTextColor(TFT_WHITE, alertFill);
+    tft_.setTextFont(1);
+    tft_.drawString(alertText, tft_.width() / 2, statsY + 80);
   }
   tft_.setTextDatum(TL_DATUM);
 
