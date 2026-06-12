@@ -270,7 +270,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   tft_.setTextFont(1);
   tft_.setTextColor(text, scopeBg);
   tft_.drawString(settings.scopeMode ? "SCOPE" : "RADAR", 6, 4);
-  tft_.drawString("AC " + String(aircraft.size()), 58, 4);
+  tft_.drawString("Tracked " + String(aircraft.size()), 58, 4);
   tft_.drawString("WiFi " + wifiStatus, 6, 16);
   tft_.drawString("GPS " + gpsStatus, 6, 28);
   tft_.setTextDatum(TR_DATUM);
