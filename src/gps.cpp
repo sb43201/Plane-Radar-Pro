@@ -20,6 +20,24 @@ void GPSModule::update() {
     gps_.encode(c);
     lastDataMs_ = millis();
   }
+
+  const uint32_t now = millis();
+  if (now - lastDebugMs_ >= 5000) {
+    const uint32_t chars = gps_.charsProcessed();
+    const uint32_t deltaChars = chars - lastCharsProcessed_;
+    lastCharsProcessed_ = chars;
+    lastDebugMs_ = now;
+
+    if (deltaChars > 0) {
+      Serial.printf("[gps] rx=%lu chars/5s total=%lu valid=%lu failed=%lu sats=%lu fix=%s locAge=%lu ms\n",
+                    deltaChars, chars, gps_.passedChecksum(), gps_.failedChecksum(), satellites(),
+                    hasFix() ? "yes" : "no",
+                    gps_.location.isValid() ? gps_.location.age() : 0UL);
+    } else {
+      Serial.printf("[gps] no serial data on RX=%d; check GPS TX -> ESP32 GPIO%d and common GND\n", Config::GPS_RX,
+                    Config::GPS_RX);
+    }
+  }
 }
 
 bool GPSModule::hasData() const {
