@@ -3,6 +3,9 @@
 #include <SPIFFS.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
+#include <ctype.h>
+#include <math.h>
+#include <stdlib.h>
 #include <time.h>
 #include <vector>
 
@@ -241,6 +244,46 @@ void processGpsLogging() {
   appendGpsLogLine();
 }
 
+void formatPortalCoordinate(char *buffer, size_t len, float value) {
+  snprintf(buffer, len, "%.6f", value);
+}
+
+bool parsePortalFloat(const char *text, float &value) {
+  if (!text) return false;
+  while (isspace((unsigned char)*text)) text++;
+  if (*text == '\0') return false;
+
+  char *end = nullptr;
+  const float parsed = strtof(text, &end);
+  if (end == text || isnan(parsed)) return false;
+  while (end && isspace((unsigned char)*end)) end++;
+  if (end && *end != '\0') return false;
+
+  value = parsed;
+  return true;
+}
+
+void applyPortalHomeLocation(const char *latText, const char *lonText) {
+  float lat = NAN;
+  float lon = NAN;
+  if (!parsePortalFloat(latText, lat) || !parsePortalFloat(lonText, lon)) {
+    Serial.println("[wifi] portal home location unchanged");
+    return;
+  }
+  if (lat < -90.0f || lat > 90.0f || lon < -180.0f || lon > 180.0f) {
+    Serial.printf("[wifi] portal home location rejected lat=%.6f lon=%.6f\n", lat, lon);
+    return;
+  }
+
+  airportCenterActive = false;
+  settings.homeLat = lat;
+  settings.homeLon = lon;
+  settingsStore.save(settings);
+  lastAdsbMs = 0;
+  updateAirports(true);
+  Serial.printf("[wifi] portal home location saved lat=%.6f lon=%.6f\n", settings.homeLat, settings.homeLon);
+}
+
 void startWiFi() {
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
@@ -248,6 +291,14 @@ void startWiFi() {
   wm.setConnectTimeout(30);
   wm.setConnectRetries(2);
   wm.setSaveConfigCallback(markWifiPortalSaved);
+  char portalLat[18];
+  char portalLon[18];
+  formatPortalCoordinate(portalLat, sizeof(portalLat), settings.homeLat);
+  formatPortalCoordinate(portalLon, sizeof(portalLon), settings.homeLon);
+  WiFiManagerParameter homeLatParam("home_lat", "Home latitude", portalLat, sizeof(portalLat) - 1);
+  WiFiManagerParameter homeLonParam("home_lon", "Home longitude", portalLon, sizeof(portalLon) - 1);
+  wm.addParameter(&homeLatParam);
+  wm.addParameter(&homeLonParam);
 
   const String savedSsid = wm.getWiFiSSID(true);
   const String savedPass = wm.getWiFiPass(true);
@@ -272,6 +323,7 @@ void startWiFi() {
                 WiFi.localIP().toString().c_str());
   if (ok) {
     wifiExt.addOrUpdate(wm.getWiFiSSID(true), wm.getWiFiPass(true), true);
+    applyPortalHomeLocation(homeLatParam.getValue(), homeLonParam.getValue());
   }
   if (ok && wifiPortalSaved) {
     Serial.println("[wifi] portal saved credentials; rebooting into radar mode");
@@ -424,10 +476,19 @@ void startAddNetworkPortal() {
   wm.setConnectTimeout(30);
   wm.setConnectRetries(2);
   wm.setSaveConfigCallback(markWifiPortalSaved);
+  char portalLat[18];
+  char portalLon[18];
+  formatPortalCoordinate(portalLat, sizeof(portalLat), settings.homeLat);
+  formatPortalCoordinate(portalLon, sizeof(portalLon), settings.homeLon);
+  WiFiManagerParameter homeLatParam("home_lat", "Home latitude", portalLat, sizeof(portalLat) - 1);
+  WiFiManagerParameter homeLonParam("home_lon", "Home longitude", portalLon, sizeof(portalLon) - 1);
+  wm.addParameter(&homeLatParam);
+  wm.addParameter(&homeLonParam);
   Serial.println("[wifi] starting add-network portal");
   bool ok = wm.startConfigPortal(Config::WIFI_AP_NAME);
   if (ok) {
     wifiExt.addOrUpdate(wm.getWiFiSSID(true), wm.getWiFiPass(true), true);
+    applyPortalHomeLocation(homeLatParam.getValue(), homeLonParam.getValue());
     wifiStatus = connectedWifiLabel();
     Serial.printf("[wifi] added portal network ssid=%s\n", wm.getWiFiSSID(true).c_str());
   } else {

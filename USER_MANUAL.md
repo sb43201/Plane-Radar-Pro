@@ -173,8 +173,12 @@ Setup flow:
 3. If it does not connect automatically, connect your phone to `PlaneRadar-Setup`.
 4. Open `192.168.4.1` in your phone browser.
 5. Select your phone hotspot SSID.
-6. Enter the hotspot password and save.
-7. The ESP32 saves credentials and restarts into radar mode.
+6. Enter the hotspot password.
+7. Optional: enter manual home latitude and longitude.
+8. Save.
+
+The captive portal home latitude/longitude fields are optional. If GPS has a fix, you can also use `Setup > Use GPS` later.
+9. The ESP32 saves credentials and restarts into radar mode.
 
 Future boots try saved networks by priority, using up to 30 seconds per attempt, before opening setup mode.
 
@@ -250,7 +254,9 @@ Adding a network:
 4. Connect your phone/laptop to `PlaneRadar-Setup`.
 5. Open `192.168.4.1`.
 6. Select the WiFi network or phone hotspot.
-7. Enter the password and save.
+7. Enter the password.
+8. Optional: update the manual home latitude and longitude.
+9. Save.
 
 You do not need to disconnect from the current WiFi before adding a new home WiFi or phone hotspot. The new network is added to the saved list, and existing networks remain saved unless you delete them or disable them with `On/Off`.
 
