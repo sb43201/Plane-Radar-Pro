@@ -60,7 +60,7 @@ constexpr int TOUCH_MAX_Y = 3850;
 constexpr float DEFAULT_HOME_LAT = 39.7684f;
 constexpr float DEFAULT_HOME_LON = -86.1581f;
 constexpr uint16_t DEFAULT_RANGE_KM = 25;
-constexpr uint16_t RANGE_OPTIONS[] = {10, 25, 50, 100};
+constexpr uint16_t RANGE_OPTIONS[] = {5, 10, 25, 50, 100};
 constexpr size_t RANGE_OPTION_COUNT = sizeof(RANGE_OPTIONS) / sizeof(RANGE_OPTIONS[0]);
 
 constexpr uint32_t ADSB_REFRESH_MS = 5000;
