@@ -105,7 +105,7 @@ class DisplayUI {
 
   void header(const AppSettings &settings, const String &title, const String &rightText);
   void button(int16_t x, int16_t y, int16_t w, int16_t h, const String &label, uint16_t fill, uint16_t text);
-  void drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, bool selected);
+  void drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, uint16_t outlineColor, bool selected);
   void drawBottomNav(const AppSettings &settings, ScreenId active);
   const Aircraft *findAircraft(const std::vector<Aircraft> &aircraft, const String &hex) const;
   String hitAircraft(int16_t x, int16_t y, const AppSettings &settings, const std::vector<Aircraft> &aircraft);

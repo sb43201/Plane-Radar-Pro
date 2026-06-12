@@ -203,7 +203,8 @@ void DisplayUI::button(int16_t x, int16_t y, int16_t w, int16_t h, const String 
   tft_.setTextDatum(TL_DATUM);
 }
 
-void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, bool selected) {
+void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, uint16_t outlineColor,
+                                 bool selected) {
   const float angle = (isnan(heading) ? 0 : heading) * PI / 180.0f;
   const int16_t noseX = x + roundf(sinf(angle) * 10);
   const int16_t noseY = y - roundf(cosf(angle) * 10);
@@ -211,9 +212,13 @@ void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t c
   const int16_t leftY = y - roundf(cosf(angle + 2.45f) * 8);
   const int16_t rightX = x + roundf(sinf(angle - 2.45f) * 8);
   const int16_t rightY = y - roundf(cosf(angle - 2.45f) * 8);
+  tft_.drawCircle(x, y, 12, outlineColor);
   tft_.fillTriangle(noseX, noseY, leftX, leftY, rightX, rightY, color);
-  tft_.drawTriangle(noseX, noseY, leftX, leftY, rightX, rightY, TFT_BLACK);
-  if (selected) tft_.drawCircle(x, y, 13, TFT_WHITE);
+  tft_.drawTriangle(noseX, noseY, leftX, leftY, rightX, rightY, outlineColor);
+  if (selected) {
+    tft_.drawCircle(x, y, 14, outlineColor);
+    tft_.drawCircle(x, y, 15, outlineColor);
+  }
 }
 
 void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
@@ -249,6 +254,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   const uint16_t text = scopeStyle ? 0xB7FF : fg(settings);
   const uint16_t dimText = scopeStyle ? 0x7BEF : muted(settings);
   const uint16_t airportColor = scopeStyle ? TFT_MAGENTA : TFT_ORANGE;
+  const uint16_t aircraftOutline = scopeStyle ? TFT_WHITE : TFT_BLACK;
   const int16_t navY = tft_.height() - 38;
   tft_.startWrite();
   if (force) {
@@ -339,7 +345,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
       }
       continue;
     }
-    drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), selectedHex_ == a.hex);
+    drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), aircraftOutline, selectedHex_ == a.hex);
     const int16_t labelX = p.x < cx ? p.x + 10 : p.x - 58;
     const int16_t labelY = p.y - 16;
     tft_.setTextFont(1);
@@ -620,7 +626,7 @@ void DisplayUI::drawAircraftDetail(const AppSettings &settings, const Aircraft *
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(4);
   tft_.drawString(safeFlight(a), 18, 52);
-  drawAircraftIcon(tft_.width() - 36, 68, a.track, altitudeColor(a.altBaro), false);
+  drawAircraftIcon(tft_.width() - 36, 68, a.track, altitudeColor(a.altBaro), fg(settings), false);
 
   tft_.setTextFont(2);
   const float dist = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
