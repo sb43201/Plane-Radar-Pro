@@ -55,6 +55,14 @@ void updateAirports(bool force = false);
 void continueStartupAfterCalibration();
 void startTouchCalibration(bool startupMode);
 
+String connectedWifiLabel() {
+  String ssid = WiFi.SSID();
+  ssid.trim();
+  if (ssid.isEmpty()) return "Connected";
+  if (ssid.length() > 14) ssid = ssid.substring(0, 14);
+  return ssid;
+}
+
 void markWifiPortalSaved() {
   wifiPortalSaved = true;
   Serial.println("[wifi] credentials saved from captive portal");
@@ -246,8 +254,8 @@ void startWiFi() {
       delay(50);
     }
     if (WiFi.status() == WL_CONNECTED) {
-      wifiStatus = "Connected";
-      Serial.printf("[wifi] connected ip=%s\n", WiFi.localIP().toString().c_str());
+      wifiStatus = connectedWifiLabel();
+      Serial.printf("[wifi] connected ssid=%s ip=%s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
       configureTimeIfNeeded();
       return;
     }
@@ -257,8 +265,9 @@ void startWiFi() {
   display.drawWiFiSetup(settings, savedSsid, "WiFi: Setup Mode");
   Serial.println("[wifi] starting WiFiManager setup portal");
   bool ok = wm.autoConnect(Config::WIFI_AP_NAME);
-  wifiStatus = ok ? "Connected" : "Searching";
-  Serial.printf("[wifi] %s ip=%s\n", ok ? "connected" : "not connected", WiFi.localIP().toString().c_str());
+  wifiStatus = ok ? connectedWifiLabel() : "Searching";
+  Serial.printf("[wifi] %s ssid=%s ip=%s\n", ok ? "connected" : "not connected", WiFi.SSID().c_str(),
+                WiFi.localIP().toString().c_str());
   if (ok && wifiPortalSaved) {
     Serial.println("[wifi] portal saved credentials; rebooting into radar mode");
     delay(500);
@@ -269,7 +278,11 @@ void startWiFi() {
 
 void maintainWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
-    wifiStatus = "Connected";
+    String newStatus = connectedWifiLabel();
+    if (newStatus != wifiStatus) {
+      wifiStatus = newStatus;
+      display.invalidate();
+    }
     configureTimeIfNeeded();
     return;
   }
@@ -646,7 +659,7 @@ void drawCurrentScreen(bool force = false) {
       display.drawAirportDetail(settings, selectedAirport(), aircraft, force);
       break;
     case ScreenId::Settings:
-      display.drawSettings(settings, force);
+      display.drawSettings(settings, wifiStatus, force);
       break;
     case ScreenId::TouchCalibration:
       display.drawTouchCalibration(settings, calibrationStep, false);

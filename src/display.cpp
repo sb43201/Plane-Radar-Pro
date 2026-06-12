@@ -641,11 +641,13 @@ void DisplayUI::drawTouchCalibration(const AppSettings &settings, uint8_t step, 
   tft_.setTextDatum(TL_DATUM);
 }
 
-void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
+void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStatus, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
-  header(settings, "Settings", settings.scopeMode ? "Scope" : "Radar");
+  String right = "WiFi " + wifiStatus;
+  if (right.length() > 20) right = right.substring(0, 20);
+  header(settings, "Settings", right);
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(2);
   tft_.drawString("Latitude", 16, 48);
