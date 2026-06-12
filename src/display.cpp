@@ -400,7 +400,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
 void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<Airport> &airports, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  const uint8_t maxRows = 7;
+  const uint8_t maxRows = 8;
   const uint8_t inRangeCount = airportInRangeCount(settings, airports);
   if (inRangeCount <= maxRows) airportListOffset_ = 0;
   else if (airportListOffset_ > inRangeCount - maxRows) airportListOffset_ = inRangeCount - maxRows;
@@ -816,7 +816,7 @@ String DisplayUI::hitAirportRow(int16_t x, int16_t y, const AppSettings &setting
   for (const Airport &airport : airports) {
     if (airport.distanceKm > settings.rangeKm) continue;
     if (skipped++ < airportListOffset_) continue;
-    if (row >= 7) break;
+    if (row >= 8) break;
     if (inRect(x, y, 8, 42 + row * 42, tft_.width() - 16, 36)) return AirportManager::displayCode(airport);
     row++;
   }
@@ -852,7 +852,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   if (!point.touched) return event;
 
   if (screen == ScreenId::AirportList) {
-    const uint8_t maxRows = 7;
+    const uint8_t maxRows = 8;
     const uint8_t inRangeCount = airportInRangeCount(settings, airports);
     if (inRangeCount > maxRows && inRect(point.x, point.y, 4, 374, 100, 48)) {
       if (airportListOffset_ > 0) {
