@@ -438,14 +438,14 @@ void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<A
     tft_.drawString("No airports inside " + String(settings.rangeKm) + " km", tft_.width() / 2, tft_.height() / 2);
     tft_.setTextDatum(TL_DATUM);
   } else if (inRangeCount > maxRows) {
-    button(10, 382, 72, 28, "Up", airportListOffset_ > 0 ? panel(settings) : muted(settings), fg(settings));
-    button(tft_.width() - 82, 382, 72, 28, "Down",
+    button(10, 406, 72, 28, "Up", airportListOffset_ > 0 ? panel(settings) : muted(settings), fg(settings));
+    button(tft_.width() - 82, 406, 72, 28, "Down",
            airportListOffset_ + maxRows < inRangeCount ? accent(settings) : muted(settings), TFT_WHITE);
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.setTextDatum(MC_DATUM);
     tft_.drawString(String(airportListOffset_ + 1) + "-" + String(airportListOffset_ + row) + " / " +
                         String(inRangeCount),
-                    tft_.width() / 2, 396);
+                    tft_.width() / 2, 392);
     tft_.setTextDatum(TL_DATUM);
   }
   drawBottomNav(settings, ScreenId::AirportList);
@@ -889,7 +889,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   } else if (screen == ScreenId::AirportList) {
     const uint8_t maxRows = 8;
     const uint8_t inRangeCount = airportInRangeCount(settings, airports);
-    if (inRangeCount > maxRows && inRect(point.x, point.y, 10, 382, 72, 28)) {
+    if (inRangeCount > maxRows && inRect(point.x, point.y, 2, 396, 92, 42)) {
       if (airportListOffset_ > 0) {
         airportListOffset_--;
         dirty_ = true;
@@ -897,7 +897,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
       return event;
     }
-    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 82, 382, 72, 28)) {
+    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 94, 396, 92, 42)) {
       if (airportListOffset_ + maxRows < inRangeCount) {
         airportListOffset_++;
         dirty_ = true;
