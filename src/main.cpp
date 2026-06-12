@@ -616,7 +616,7 @@ void drawCurrentScreen(bool force = false) {
                         alertStatus, airportManager.airports(), airportManager.statusText(), force);
       break;
     case ScreenId::AircraftList:
-      display.drawAircraftList(settings, aircraft, force);
+      display.drawAircraftList(settings, aircraft, lastUpdateText, force);
       break;
     case ScreenId::AirportList:
       display.drawAirportList(settings, airportManager.airports(), force);

@@ -482,21 +482,38 @@ void DisplayUI::drawAirportDetail(const AppSettings &settings, const Airport *ai
   drawBottomNav(settings, ScreenId::AirportDetail);
 }
 
-void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force) {
+void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft,
+                                 const String &lastUpdateText, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
   header(settings, "Nearest Aircraft", String(aircraft.size()) + " tracked");
+
+  const int16_t summaryY = 40;
+  tft_.fillRoundRect(8, summaryY, tft_.width() - 16, 58, 6, panel(settings));
+  tft_.setTextDatum(MC_DATUM);
+  tft_.setTextFont(4);
+  tft_.setTextColor(accent(settings), panel(settings));
+  tft_.drawString(String(settings.rangeKm) + " km", tft_.width() / 2, summaryY + 18);
+  tft_.setTextFont(2);
+  tft_.setTextColor(fg(settings), panel(settings));
+  tft_.drawString("SCAN RADIUS   " + String(aircraft.size()) + " AIRCRAFT", tft_.width() / 2, summaryY + 42);
+  tft_.setTextDatum(TL_DATUM);
+  tft_.setTextFont(1);
+  tft_.setTextColor(muted(settings), bg(settings));
+  tft_.drawString(lastUpdateText, 12, 104);
+
   auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, 6);
   if (order.empty()) {
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.setTextDatum(MC_DATUM);
-    tft_.drawString("No aircraft in range", tft_.width() / 2, tft_.height() / 2);
+    tft_.drawString("No aircraft in range", tft_.width() / 2, tft_.height() / 2 + 24);
     tft_.setTextDatum(TL_DATUM);
   }
-  for (uint8_t row = 0; row < order.size(); ++row) {
+  const uint8_t maxRows = min((size_t)5, order.size());
+  for (uint8_t row = 0; row < maxRows; ++row) {
     const Aircraft &a = aircraft[order[row]];
-    const int16_t y = 42 + row * 50;
+    const int16_t y = 118 + row * 48;
     tft_.fillRoundRect(8, y, tft_.width() - 16, 44, 5, panel(settings));
     tft_.fillCircle(22, y + 15, 6, altitudeColor(a.altBaro));
     tft_.setTextColor(fg(settings), panel(settings));
@@ -707,8 +724,9 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     }
   } else if (screen == ScreenId::AircraftList) {
     auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, 6);
-    for (uint8_t row = 0; row < order.size(); ++row) {
-      if (inRect(point.x, point.y, 8, 42 + row * 50, tft_.width() - 16, 44)) {
+    const uint8_t maxRows = min((size_t)5, order.size());
+    for (uint8_t row = 0; row < maxRows; ++row) {
+      if (inRect(point.x, point.y, 8, 118 + row * 48, tft_.width() - 16, 44)) {
         event.aircraftHex = aircraft[order[row]].hex;
         selectedHex_ = event.aircraftHex;
         event.action = UIAction::ShowDetail;

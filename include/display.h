@@ -57,7 +57,8 @@ class DisplayUI {
                  const String &gpsStatus, const String &gpsCompass, const String &batteryStatus, const String &timeText,
                  const String &lastUpdateText, const String &alertText, const std::vector<Airport> &airports,
                  const String &airportStatus, bool force = false);
-  void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force = false);
+  void drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft,
+                        const String &lastUpdateText, bool force = false);
   void drawAircraftDetail(const AppSettings &settings, const Aircraft *aircraft, bool force = false);
   void drawAirportList(const AppSettings &settings, const std::vector<Airport> &airports, bool force = false);
   void drawAirportDetail(const AppSettings &settings, const Airport *airport, const std::vector<Aircraft> &aircraft,
