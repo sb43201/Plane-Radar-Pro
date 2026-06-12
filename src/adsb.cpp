@@ -17,6 +17,20 @@ String cleanFlight(const char *flight) {
 bool hasPosition(const Aircraft &a) {
   return !isnan(a.lat) && !isnan(a.lon);
 }
+
+void addAircraftFilter(JsonVariant variant) {
+  variant["hex"] = true;
+  variant["flight"] = true;
+  variant["t"] = true;
+  variant["type"] = true;
+  variant["lat"] = true;
+  variant["lon"] = true;
+  variant["alt_baro"] = true;
+  variant["gs"] = true;
+  variant["track"] = true;
+  variant["seen"] = true;
+  variant["category"] = true;
+}
 }  // namespace
 
 bool ADSBClient::fetch(float homeLat, float homeLon, uint16_t rangeKm, std::vector<Aircraft> &aircraft) {
@@ -53,7 +67,10 @@ bool ADSBClient::fetch(float homeLat, float homeLon, uint16_t rangeKm, std::vect
   }
 
   JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
+  JsonDocument filter;
+  addAircraftFilter(filter["aircraft"][0]);
+  addAircraftFilter(filter["ac"][0]);
+  DeserializationError err = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
   http.end();
   if (err) {
     lastError_ = "JSON " + String(err.c_str());
@@ -103,8 +120,7 @@ bool ADSBClient::fetch(float homeLat, float homeLon, uint16_t rangeKm, std::vect
   }
 
   aircraft.erase(std::remove_if(aircraft.begin(), aircraft.end(), [&](const Aircraft &a) {
-                   const bool inResponse = std::find(seenHexes.begin(), seenHexes.end(), a.hex) != seenHexes.end();
-                   return !inResponse && millis() - a.updatedAtMs > 30000;
+                   return std::find(seenHexes.begin(), seenHexes.end(), a.hex) == seenHexes.end();
                  }),
                  aircraft.end());
 

@@ -94,6 +94,26 @@ String compassPoint(float deg) {
   return POINTS[index];
 }
 
+const char *screenName(ScreenId screen) {
+  switch (screen) {
+    case ScreenId::Radar:
+      return "Radar";
+    case ScreenId::AircraftList:
+      return "AircraftList";
+    case ScreenId::AirportList:
+      return "AirportList";
+    case ScreenId::Detail:
+      return "AircraftDetail";
+    case ScreenId::AirportDetail:
+      return "AirportDetail";
+    case ScreenId::Settings:
+      return "Settings";
+    case ScreenId::TouchCalibration:
+      return "TouchCalibration";
+  }
+  return "Unknown";
+}
+
 void configureTimeIfNeeded() {
   if (timeConfigured || WiFi.status() != WL_CONNECTED) return;
   configTzTime("EST5EDT,M3.2.0,M11.1.0", "pool.ntp.org", "time.nist.gov");
@@ -377,6 +397,7 @@ void cycleRange() {
 }
 
 void handleUiEvent(const UIEvent &event) {
+  const ScreenId previousScreen = currentScreen;
   switch (event.action) {
     case UIAction::None:
       return;
@@ -482,6 +503,9 @@ void handleUiEvent(const UIEvent &event) {
       break;
     case UIAction::ResetWiFiHold:
       break;
+  }
+  if (previousScreen != currentScreen) {
+    Serial.printf("[ui] screen %s -> %s\n", screenName(previousScreen), screenName(currentScreen));
   }
   display.invalidate();
 }
