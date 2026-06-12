@@ -854,7 +854,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   if (screen == ScreenId::AirportList) {
     const uint8_t maxRows = 8;
     const uint8_t inRangeCount = airportInRangeCount(settings, airports);
-    if (inRangeCount > maxRows && inRect(point.x, point.y, 2, 396, 92, 42)) {
+    if (inRangeCount > maxRows && inRect(point.x, point.y, 2, 360, 118, 78)) {
       if (airportListOffset_ > 0) {
         airportListOffset_--;
         dirty_ = true;
@@ -864,7 +864,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
       return event;
     }
-    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 94, 396, 92, 42)) {
+    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 120, 360, 118, 78)) {
       if (airportListOffset_ + maxRows < inRangeCount) {
         airportListOffset_++;
         dirty_ = true;
