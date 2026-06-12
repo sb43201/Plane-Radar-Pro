@@ -14,6 +14,7 @@
 #include "radar.h"
 #include "settings.h"
 #include "touch.h"
+#include "wifi_manager_ext.h"
 
 SettingsStore settingsStore;
 AppSettings settings;
@@ -22,6 +23,7 @@ TouchInput touch;
 ADSBClient adsb;
 GPSModule gps;
 AirportManager airportManager;
+WiFiManagerExt wifiExt;
 std::vector<Aircraft> aircraft;
 
 ScreenId currentScreen = ScreenId::Radar;
@@ -116,6 +118,8 @@ const char *screenName(ScreenId screen) {
       return "AirportDetail";
     case ScreenId::Settings:
       return "Settings";
+    case ScreenId::WiFiSettings:
+      return "WiFiSettings";
     case ScreenId::TouchCalibration:
       return "TouchCalibration";
   }
@@ -233,32 +237,22 @@ void startWiFi() {
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   wm.setDebugOutput(true);
-  wm.setConnectTimeout(60);
-  wm.setConnectRetries(3);
+  wm.setConnectTimeout(30);
+  wm.setConnectRetries(2);
   wm.setSaveConfigCallback(markWifiPortalSaved);
 
   const String savedSsid = wm.getWiFiSSID(true);
-  if (savedSsid.length()) {
-    wifiStatus = "Searching";
-    Serial.printf("[wifi] trying saved hotspot: %s\n", savedSsid.c_str());
-    display.drawWiFiSetup(settings, savedSsid, "WiFi: Searching");
-    WiFi.begin();
-    const uint32_t startMs = millis();
-    uint32_t lastDrawMs = 0;
-    while (WiFi.status() != WL_CONNECTED && millis() - startMs < Config::WIFI_CONNECT_TIMEOUT_MS) {
-      if (millis() - lastDrawMs >= 1000) {
-        lastDrawMs = millis();
-        display.drawWiFiSetup(settings, savedSsid, "Trying saved hotspot");
-        Serial.printf("[wifi] connecting to %s, status=%d\n", savedSsid.c_str(), WiFi.status());
-      }
-      delay(50);
-    }
-    if (WiFi.status() == WL_CONNECTED) {
-      wifiStatus = connectedWifiLabel();
-      Serial.printf("[wifi] connected ssid=%s ip=%s\n", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
-      configureTimeIfNeeded();
-      return;
-    }
+  const String savedPass = wm.getWiFiPass(true);
+  if (wifiExt.networks().empty() && savedSsid.length()) {
+    wifiExt.addOrUpdate(savedSsid, savedPass, true);
+  }
+
+  wifiStatus = "Searching";
+  display.drawWiFiSetup(settings, savedSsid, "WiFi: Searching");
+  if (wifiExt.connectSaved(30000, 2)) {
+    wifiStatus = connectedWifiLabel();
+    configureTimeIfNeeded();
+    return;
   }
 
   wifiStatus = "Setup Mode";
@@ -268,6 +262,9 @@ void startWiFi() {
   wifiStatus = ok ? connectedWifiLabel() : "Searching";
   Serial.printf("[wifi] %s ssid=%s ip=%s\n", ok ? "connected" : "not connected", WiFi.SSID().c_str(),
                 WiFi.localIP().toString().c_str());
+  if (ok) {
+    wifiExt.addOrUpdate(wm.getWiFiSSID(true), wm.getWiFiPass(true), true);
+  }
   if (ok && wifiPortalSaved) {
     Serial.println("[wifi] portal saved credentials; rebooting into radar mode");
     delay(500);
@@ -295,8 +292,8 @@ void maintainWiFi() {
   const uint32_t now = millis();
   if (now - lastReconnectMs < Config::WIFI_RECONNECT_MS) return;
   lastReconnectMs = now;
-  Serial.println("[wifi] reconnecting");
-  WiFi.reconnect();
+  Serial.println("[wifi] reconnecting through saved network list");
+  wifiExt.processReconnect(30000, 2);
 }
 
 void refreshAdsbIfDue(bool force = false) {
@@ -411,6 +408,27 @@ void cycleRange() {
   Serial.printf("[settings] range=%u km\n", settings.rangeKm);
 }
 
+void startAddNetworkPortal() {
+  wifiStatus = "Setup Mode";
+  display.drawWiFiSetup(settings, "", "Add WiFi Network");
+  WiFiManager wm;
+  wm.setDebugOutput(true);
+  wm.setConnectTimeout(30);
+  wm.setConnectRetries(2);
+  wm.setSaveConfigCallback(markWifiPortalSaved);
+  Serial.println("[wifi] starting add-network portal");
+  bool ok = wm.startConfigPortal(Config::WIFI_AP_NAME);
+  if (ok) {
+    wifiExt.addOrUpdate(wm.getWiFiSSID(true), wm.getWiFiPass(true), true);
+    wifiStatus = connectedWifiLabel();
+    Serial.printf("[wifi] added portal network ssid=%s\n", wm.getWiFiSSID(true).c_str());
+  } else {
+    wifiStatus = WiFi.status() == WL_CONNECTED ? connectedWifiLabel() : "Searching";
+    Serial.println("[wifi] add-network portal closed without connection");
+  }
+  display.invalidate();
+}
+
 void handleUiEvent(const UIEvent &event) {
   const ScreenId previousScreen = currentScreen;
   switch (event.action) {
@@ -427,6 +445,9 @@ void handleUiEvent(const UIEvent &event) {
       break;
     case UIAction::ShowSettings:
       currentScreen = ScreenId::Settings;
+      break;
+    case UIAction::ShowWiFiSettings:
+      currentScreen = ScreenId::WiFiSettings;
       break;
     case UIAction::ShowDetail:
       selectedHex = event.aircraftHex;
@@ -534,6 +555,31 @@ void handleUiEvent(const UIEvent &event) {
       delay(150);
       ESP.restart();
       break;
+    case UIAction::SelectWifiNetwork:
+      wifiExt.setSelectedIndex(event.wifiIndex);
+      break;
+    case UIAction::WifiAddPortal:
+      startAddNetworkPortal();
+      currentScreen = ScreenId::WiFiSettings;
+      break;
+    case UIAction::WifiDelete:
+      wifiExt.remove(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiMoveUp:
+      wifiExt.moveUp(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiMoveDown:
+      wifiExt.moveDown(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiToggle:
+      wifiExt.toggleEnabled(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiExport:
+      lastUpdateText = wifiExt.exportToSd() ? "WiFi exported" : "WiFi export failed";
+      break;
+    case UIAction::WifiImport:
+      lastUpdateText = wifiExt.importFromSd() ? "WiFi imported" : "WiFi import failed";
+      break;
     case UIAction::ResetWiFiHold:
       break;
   }
@@ -615,6 +661,7 @@ void resetWiFiAndRestart() {
   display.drawWiFiSetup(settings, "", "Clearing WiFi");
   WiFiManager wm;
   wm.resetSettings();
+  wifiExt.clear();
   WiFi.disconnect(true, true);
   delay(500);
   ESP.restart();
@@ -661,6 +708,9 @@ void drawCurrentScreen(bool force = false) {
     case ScreenId::Settings:
       display.drawSettings(settings, wifiStatus, force);
       break;
+    case ScreenId::WiFiSettings:
+      display.drawWiFiSettings(settings, wifiExt, force);
+      break;
     case ScreenId::TouchCalibration:
       display.drawTouchCalibration(settings, calibrationStep, false);
       break;
@@ -693,6 +743,7 @@ void setup() {
 
   settingsStore.begin();
   settings = settingsStore.load();
+  wifiExt.begin();
   initializeGpsLog();
   aircraft.reserve(Config::MAX_AIRCRAFT);
 
@@ -726,7 +777,7 @@ void loop() {
   refreshAdsbIfDue();
 
   TouchPoint point = touch.read(settings);
-  UIEvent event = display.handleTouch(point, currentScreen, settings, aircraft, airportManager.airports());
+  UIEvent event = display.handleTouch(point, currentScreen, settings, aircraft, airportManager.airports(), wifiExt);
   processResetWiFiHold(event);
   handleUiEvent(event);
   if (event.action != UIAction::None) {

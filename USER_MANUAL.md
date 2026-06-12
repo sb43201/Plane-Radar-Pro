@@ -176,7 +176,7 @@ Setup flow:
 6. Enter the hotspot password and save.
 7. The ESP32 saves credentials and restarts into radar mode.
 
-Future boots retry the saved hotspot for up to 60 seconds before opening setup mode again.
+Future boots try saved networks by priority, using up to 30 seconds per attempt, before opening setup mode.
 
 Phone hotspot notes:
 
@@ -192,31 +192,102 @@ Phone hotspot notes:
 
 ## Switching Between Home WiFi And Phone Hotspot
 
-Plane Radar Pro uses the ESP32's saved station credentials. In normal WiFiManager mode, the ESP32 stores one WiFi SSID/password pair at a time.
+Plane Radar Pro supports up to 10 saved WiFi networks. Each saved network has:
+
+- SSID
+- Password, stored but not displayed
+- Priority order
+- Enabled/disabled state
+
+At boot, Plane Radar Pro loads the saved network list, sorts it by priority, and tries enabled networks in order. It tries each network for up to 30 seconds and retries before moving to the next one. If none connect, it opens the `PlaneRadar-Setup` captive portal.
 
 Best no-reset method:
 
-1. Set your phone hotspot name/SSID to exactly match your home WiFi SSID.
-2. Set your phone hotspot password to exactly match your home WiFi password.
-3. When you are home, leave the phone hotspot off and Plane Radar Pro connects to home WiFi.
-4. When traveling, turn on the phone hotspot and Plane Radar Pro connects to the hotspot using the same saved credentials.
+1. Save both your home WiFi and phone hotspot in WiFi Settings.
+2. Put the network you prefer first in priority order.
+3. Enable both networks.
+4. When you are home, Plane Radar Pro connects to home WiFi.
+5. When traveling, turn on the phone hotspot and Plane Radar Pro connects to the hotspot.
 
-To switch to a different SSID/password:
+Alternative simple method:
+
+Set your phone hotspot SSID and password to exactly match your home WiFi SSID and password. Then the ESP32 can use the same saved credentials for both.
+
+## Multi-WiFi Support
+
+Open `Setup`, then tap `WiFi` to open the WiFi Settings page.
+
+The WiFi Settings page shows:
+
+- Saved networks
+- Priority number
+- Enabled/disabled state
+- Connected network
+- IP address
+- RSSI signal strength
+
+Controls:
+
+| Control | Action |
+| --- | --- |
+| Saved network row | Select network |
+| Add | Opens `PlaneRadar-Setup` portal to add/update a network |
+| Delete | Deletes the selected network |
+| On/Off | Enables or disables the selected network |
+| Up | Moves selected network higher priority |
+| Dn | Moves selected network lower priority |
+| Export | Saves `/wifi_config.json` to SD card |
+| Import | Loads `/wifi_config.json` from SD card |
+| Reset WiFi | Hold 3 seconds to clear all saved WiFi |
+
+Adding a network:
 
 1. Tap `Setup`.
-2. Hold `Reset WiFi` for 3 seconds.
-3. Reconnect to `PlaneRadar-Setup`.
-4. Open `192.168.4.1`.
-5. Select the new WiFi or hotspot and save.
+2. Tap `WiFi`.
+3. Tap `Add`.
+4. Connect your phone/laptop to `PlaneRadar-Setup`.
+5. Open `192.168.4.1`.
+6. Select the WiFi network or phone hotspot.
+7. Enter the password and save.
+
+Passwords are not shown on the ESP32 screen. They are stored in ESP32 Preferences/NVS and can be exported to SD card only if you choose `Export`.
+
+SD backup file:
+
+```text
+/wifi_config.json
+```
+
+Example:
+
+```json
+{
+  "networks": [
+    {
+      "ssid": "Bin-iPhone",
+      "password": "xxxx",
+      "priority": 1,
+      "enabled": true
+    }
+  ]
+}
+```
+
+Automatic reconnect:
+
+- If WiFi drops while running, the UI stays active.
+- Plane Radar Pro retries every 10 seconds.
+- If the current SSID is unavailable, it tries other enabled saved networks.
 
 ## Reset WiFi
 
 To clear saved WiFi credentials:
 
 1. Tap `Setup`.
-2. Press and hold `Reset WiFi` for 3 seconds.
-3. The ESP32 clears saved WiFi credentials.
-4. The ESP32 restarts and reopens `PlaneRadar-Setup`.
+2. Tap `WiFi` if you want to manage the full network list, or use `Reset WiFi` from Setup.
+3. Press and hold `Reset WiFi` for 3 seconds.
+4. The ESP32 clears saved WiFi credentials.
+5. The ESP32 restarts and reopens `PlaneRadar-Setup`.
 
 ## Radar Screen
 
@@ -271,7 +342,8 @@ Settings screen:
 | Airport Label Distance | Cycle 10, 25, 50, 100, 150 km |
 | Cal Touch | Start four-point touchscreen calibration |
 | Log On / Log Off | Toggle GPS location logging |
-| Reset WiFi | Hold 3 seconds to reset WiFi |
+| WiFi | Open multi-network WiFi Settings |
+| Reset / Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
 
 ## Touchscreen Calibration

@@ -1,6 +1,7 @@
 #include "display.h"
 
 #include <math.h>
+#include <WiFi.h>
 
 #include "config.h"
 #include "radar.h"
@@ -51,6 +52,8 @@ const char *uiActionName(UIAction action) {
       return "ShowAirportList";
     case UIAction::ShowSettings:
       return "ShowSettings";
+    case UIAction::ShowWiFiSettings:
+      return "ShowWiFiSettings";
     case UIAction::ShowDetail:
       return "ShowDetail";
     case UIAction::ShowAirportDetail:
@@ -85,6 +88,22 @@ const char *uiActionName(UIAction action) {
       return "SaveSettings";
     case UIAction::RebootDevice:
       return "RebootDevice";
+    case UIAction::SelectWifiNetwork:
+      return "SelectWifiNetwork";
+    case UIAction::WifiAddPortal:
+      return "WifiAddPortal";
+    case UIAction::WifiDelete:
+      return "WifiDelete";
+    case UIAction::WifiMoveUp:
+      return "WifiMoveUp";
+    case UIAction::WifiMoveDown:
+      return "WifiMoveDown";
+    case UIAction::WifiToggle:
+      return "WifiToggle";
+    case UIAction::WifiExport:
+      return "WifiExport";
+    case UIAction::WifiImport:
+      return "WifiImport";
     case UIAction::ResetWiFiHold:
       return "ResetWiFiHold";
   }
@@ -703,10 +722,62 @@ void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStat
   tft_.drawString("Refresh", 16, 288);
   button(206, 282, 100, 28, String(settings.adsbRefreshSec) + " sec", accent(settings), TFT_WHITE);
 
-  button(10, 334, 96, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
-  button(112, 334, 86, 30, "Reboot", settingsPanel, settingsText);
-  button(204, 334, 106, 30, "Save", TFT_GREEN, TFT_BLACK);
+  button(10, 334, 72, 30, "Reset", TFT_RED, TFT_WHITE);
+  button(88, 334, 68, 30, "WiFi", settingsPanel, settingsText);
+  button(162, 334, 74, 30, "Reboot", settingsPanel, settingsText);
+  button(242, 334, 68, 30, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
+}
+
+void DisplayUI::drawWiFiSettings(const AppSettings &settings, const WiFiManagerExt &wifi, bool force) {
+  if (!dirty_ && !force) return;
+  dirty_ = false;
+  tft_.fillScreen(bg(settings));
+  header(settings, "WiFi Settings", wifi.statusText());
+
+  const auto &networks = wifi.networks();
+  if (networks.empty()) {
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.drawString("No saved networks", tft_.width() / 2, 96);
+    tft_.setTextDatum(TL_DATUM);
+  }
+
+  const uint8_t rows = min((size_t)4, networks.size());
+  for (uint8_t row = 0; row < rows; ++row) {
+    const WifiCredential &cred = networks[row];
+    const int16_t y = 42 + row * 40;
+    const bool selected = wifi.selectedIndex() == row;
+    const uint16_t fill = selected ? accent(settings) : panel(settings);
+    const uint16_t primary = selected ? TFT_WHITE : fg(settings);
+    tft_.fillRoundRect(8, y, tft_.width() - 16, 34, 5, fill);
+    tft_.setTextColor(primary, fill);
+    tft_.setTextFont(2);
+    String label = String(row + 1) + ". " + cred.ssid;
+    if (label.length() > 22) label = label.substring(0, 22);
+    tft_.drawString(label, 16, y + 3);
+    tft_.setTextColor(selected ? TFT_WHITE : muted(settings), fill);
+    String meta = cred.enabled ? "enabled" : "disabled";
+    if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == cred.ssid) meta += "  connected";
+    tft_.drawString(meta, 34, y + 18);
+  }
+
+  tft_.setTextColor(fg(settings), bg(settings));
+  tft_.setTextFont(2);
+  tft_.drawString("SSID: " + (wifi.currentSsid().length() ? wifi.currentSsid() : String("---")), 12, 210);
+  tft_.drawString("IP: " + wifi.ipText(), 12, 232);
+  tft_.drawString("RSSI: " + String(wifi.rssi()) + " dBm", 12, 254);
+
+  button(10, 282, 70, 28, "Add", accent(settings), TFT_WHITE);
+  button(86, 282, 70, 28, "Delete", TFT_RED, TFT_WHITE);
+  button(162, 282, 70, 28, "On/Off", panel(settings), fg(settings));
+  button(238, 282, 34, 28, "Up", panel(settings), fg(settings));
+  button(276, 282, 34, 28, "Dn", panel(settings), fg(settings));
+
+  button(10, 322, 90, 28, "Export", panel(settings), fg(settings));
+  button(108, 322, 90, 28, "Import", panel(settings), fg(settings));
+  button(206, 322, 104, 28, "Reset WiFi", TFT_RED, TFT_WHITE);
+  drawBottomNav(settings, ScreenId::WiFiSettings);
 }
 
 const Aircraft *DisplayUI::findAircraft(const std::vector<Aircraft> &aircraft, const String &hex) const {
@@ -741,8 +812,23 @@ String DisplayUI::hitAirportRow(int16_t x, int16_t y, const AppSettings &setting
   return "";
 }
 
+int DisplayUI::hitWifiRow(int16_t x, int16_t y, const WiFiManagerExt &wifi) {
+  const uint8_t rows = min((size_t)4, wifi.networks().size());
+  for (uint8_t row = 0; row < rows; ++row) {
+    if (inRect(x, y, 8, 42 + row * 40, tft_.width() - 16, 34)) return row;
+  }
+  return -1;
+}
+
 UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
                                const std::vector<Aircraft> &aircraft, const std::vector<Airport> &airports) {
+  static WiFiManagerExt emptyWifi;
+  return handleTouch(point, screen, settings, aircraft, airports, emptyWifi);
+}
+
+UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
+                               const std::vector<Aircraft> &aircraft, const std::vector<Airport> &airports,
+                               const WiFiManagerExt &wifi) {
   UIEvent event;
   if (!point.touched) return event;
 
@@ -795,6 +881,29 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       event.action = UIAction::CenterOnAirport;
       dirty_ = true;
     }
+  } else if (screen == ScreenId::WiFiSettings) {
+    int row = hitWifiRow(point.x, point.y, wifi);
+    if (row >= 0) {
+      event.wifiIndex = row;
+      event.action = UIAction::SelectWifiNetwork;
+    } else if (inRect(point.x, point.y, 10, 282, 70, 28)) {
+      event.action = UIAction::WifiAddPortal;
+    } else if (inRect(point.x, point.y, 86, 282, 70, 28)) {
+      event.action = UIAction::WifiDelete;
+    } else if (inRect(point.x, point.y, 162, 282, 70, 28)) {
+      event.action = UIAction::WifiToggle;
+    } else if (inRect(point.x, point.y, 238, 282, 34, 28)) {
+      event.action = UIAction::WifiMoveUp;
+    } else if (inRect(point.x, point.y, 276, 282, 34, 28)) {
+      event.action = UIAction::WifiMoveDown;
+    } else if (inRect(point.x, point.y, 10, 322, 90, 28)) {
+      event.action = UIAction::WifiExport;
+    } else if (inRect(point.x, point.y, 108, 322, 90, 28)) {
+      event.action = UIAction::WifiImport;
+    } else if (inRect(point.x, point.y, 206, 322, 104, 28)) {
+      event.action = UIAction::ResetWiFiHold;
+    }
+    if (event.action != UIAction::None) dirty_ = true;
   } else if (screen == ScreenId::Settings) {
     if (inRect(point.x, point.y, 226, 42, 36, 28)) event.action = UIAction::LatMinus;
     else if (inRect(point.x, point.y, 270, 42, 36, 28)) event.action = UIAction::LatPlus;
@@ -808,9 +917,10 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inRect(point.x, point.y, 110, 242, 86, 28)) event.action = UIAction::ToggleAirportOverlay;
     else if (inRect(point.x, point.y, 206, 242, 100, 28)) event.action = UIAction::AirportLabelNext;
     else if (inRect(point.x, point.y, 206, 282, 100, 28)) event.action = UIAction::RefreshRateNext;
-    else if (inRect(point.x, point.y, 10, 334, 96, 30)) event.action = UIAction::ResetWiFiHold;
-    else if (inRect(point.x, point.y, 112, 334, 86, 30)) event.action = UIAction::RebootDevice;
-    else if (inRect(point.x, point.y, 204, 334, 106, 30)) event.action = UIAction::SaveSettings;
+    else if (inRect(point.x, point.y, 10, 334, 72, 30)) event.action = UIAction::ResetWiFiHold;
+    else if (inRect(point.x, point.y, 88, 334, 68, 30)) event.action = UIAction::ShowWiFiSettings;
+    else if (inRect(point.x, point.y, 162, 334, 74, 30)) event.action = UIAction::RebootDevice;
+    else if (inRect(point.x, point.y, 242, 334, 68, 30)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }
   return event;
