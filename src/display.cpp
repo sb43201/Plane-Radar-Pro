@@ -356,7 +356,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   tft_.drawString(String(settings.rangeKm) + " km", tft_.width() / 2, statsY + 18);
   tft_.setTextFont(2);
   tft_.setTextColor(dimText, statFill);
-  tft_.drawString("RANGE     AC " + String(aircraft.size()), tft_.width() / 2, statsY + 43);
+  tft_.drawString("SCAN RADIUS   " + String(aircraft.size()) + " AIRCRAFT", tft_.width() / 2, statsY + 43);
   tft_.setTextDatum(TL_DATUM);
 
   if (force) drawBottomNav(settings, ScreenId::Radar);
