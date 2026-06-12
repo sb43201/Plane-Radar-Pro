@@ -126,6 +126,14 @@ const char *screenName(ScreenId screen) {
   return "Unknown";
 }
 
+bool allowBackgroundRedraw() {
+  return currentScreen == ScreenId::Radar || currentScreen == ScreenId::AircraftList || currentScreen == ScreenId::Detail;
+}
+
+void invalidateForBackgroundUpdate() {
+  if (allowBackgroundRedraw()) display.invalidate();
+}
+
 void configureTimeIfNeeded() {
   if (timeConfigured || WiFi.status() != WL_CONNECTED) return;
   configTzTime("EST5EDT,M3.2.0,M11.1.0", "pool.ntp.org", "time.nist.gov");
@@ -150,7 +158,7 @@ void updateBatteryStatus(bool force = false) {
   if (force || (newStatus != batteryStatus && meaningfulChange)) {
     lastBatteryVolts = batteryVolts;
     batteryStatus = newStatus;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     Serial.printf("[battery] adc=%lu mV battery=%.2f V\n", millivolts, batteryVolts);
   }
 }
@@ -278,7 +286,7 @@ void maintainWiFi() {
     String newStatus = connectedWifiLabel();
     if (newStatus != wifiStatus) {
       wifiStatus = newStatus;
-      display.invalidate();
+      invalidateForBackgroundUpdate();
     }
     configureTimeIfNeeded();
     return;
@@ -287,7 +295,7 @@ void maintainWiFi() {
   wifiStatus = "Searching";
   if (lastUpdateText != "WiFi lost") {
     lastUpdateText = "WiFi lost";
-    display.invalidate();
+    invalidateForBackgroundUpdate();
   }
   const uint32_t now = millis();
   if (now - lastReconnectMs < Config::WIFI_RECONNECT_MS) return;
@@ -303,7 +311,7 @@ void refreshAdsbIfDue(bool force = false) {
 
   if (WiFi.status() != WL_CONNECTED) {
     lastUpdateText = "WiFi lost";
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     return;
   }
 
@@ -314,7 +322,7 @@ void refreshAdsbIfDue(bool force = false) {
   } else {
     lastUpdateText = adsb.lastError();
   }
-  display.invalidate();
+  invalidateForBackgroundUpdate();
 }
 
 void updateAircraftAlerts() {
@@ -347,7 +355,7 @@ void updateAircraftAlerts() {
 
   if (newAlert != alertStatus) {
     alertStatus = newAlert;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     if (alertStatus.length()) Serial.printf("[alert] %s\n", alertStatus.c_str());
   }
 }
@@ -357,7 +365,7 @@ void updateGpsPosition() {
   const String newStatus = gps.statusText();
   if (newStatus != gpsStatus) {
     gpsStatus = newStatus;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     Serial.printf("[gps] status=%s\n", gpsStatus.c_str());
   }
 
@@ -368,7 +376,7 @@ void updateGpsPosition() {
   }
   if (newCompass != gpsCompassStatus) {
     gpsCompassStatus = newCompass;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     if (gpsCompassStatus.length()) Serial.printf("[gps] compass=%s\n", gpsCompassStatus.c_str());
   }
 
@@ -383,14 +391,14 @@ void updateGpsPosition() {
     settings.homeLon = lon;
     lastAdsbMs = 0;
     updateAirports(true);
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     Serial.printf("[gps] using GPS home position %.6f, %.6f\n", settings.homeLat, settings.homeLon);
   }
 }
 
 void updateAirports(bool force) {
   if (airportManager.refreshIfDue(settings.homeLat, settings.homeLon, force)) {
-    display.invalidate();
+    invalidateForBackgroundUpdate();
   }
 }
 
