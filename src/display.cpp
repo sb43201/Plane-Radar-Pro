@@ -347,9 +347,16 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     tft_.setTextDatum(TL_DATUM);
   }
 
-  const int16_t statsY = cy + radius + 24;
+  String nearestAirportText = airportStatus;
+  if (settings.airportOverlay && !airports.empty()) {
+    const Airport &nearestAirport = airports.front();
+    nearestAirportText = "NEAREST " + AirportManager::displayCode(nearestAirport) + "  " +
+                         String(nearestAirport.distanceKm, 1) + " km";
+  }
+
+  const int16_t statsY = cy + radius + 18;
   const uint16_t statFill = settings.scopeMode ? 0x0841 : panel(settings);
-  tft_.fillRoundRect(10, statsY, tft_.width() - 20, 58, 6, statFill);
+  tft_.fillRoundRect(10, statsY, tft_.width() - 20, 72, 6, statFill);
   tft_.setTextDatum(MC_DATUM);
   tft_.setTextFont(4);
   tft_.setTextColor(text, statFill);
@@ -357,6 +364,10 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   tft_.setTextFont(2);
   tft_.setTextColor(dimText, statFill);
   tft_.drawString("SCAN RADIUS   " + String(aircraft.size()) + " AIRCRAFT", tft_.width() / 2, statsY + 43);
+  if (nearestAirportText.length()) {
+    tft_.setTextFont(1);
+    tft_.drawString(nearestAirportText, tft_.width() / 2, statsY + 62);
+  }
   tft_.setTextDatum(TL_DATUM);
 
   if (force) drawBottomNav(settings, ScreenId::Radar);
