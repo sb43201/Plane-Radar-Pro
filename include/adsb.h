@@ -37,6 +37,8 @@ class ADSBClient {
   String lastError_;
   uint32_t lastHttpCode_ = 0;
 
+  bool parseAircraftObject(const String &json, std::vector<Aircraft> &aircraft, std::vector<String> &seenHexes,
+                           size_t &parsed);
   void mergeAircraft(std::vector<Aircraft> &aircraft, Aircraft &incoming);
   static void pushTrail(Aircraft &aircraft, float lat, float lon);
 };
