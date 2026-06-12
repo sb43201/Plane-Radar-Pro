@@ -666,10 +666,10 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   const int16_t navY = tft_.height() - 38;
   if (point.y >= navY - 10) {
     const int16_t w = tft_.width();
-    if (point.x < w * 18 / 100) event.action = UIAction::ShowRadar;
-    else if (point.x < w * 38 / 100) event.action = UIAction::ShowList;
-    else if (point.x < w * 56 / 100) event.action = UIAction::ShowAirportList;
-    else if (point.x < w * 74 / 100) event.action = UIAction::RangeNext;
+    if (point.x < w * 22 / 100) event.action = UIAction::ShowRadar;
+    else if (point.x < w * 42 / 100) event.action = UIAction::ShowList;
+    else if (point.x < w * 62 / 100) event.action = UIAction::ShowAirportList;
+    else if (point.x < w * 85 / 100) event.action = UIAction::RangeNext;
     else event.action = UIAction::ShowSettings;
   }
 
