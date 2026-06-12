@@ -20,6 +20,7 @@ struct AppSettings {
   bool scopeMode = true;
   bool airportOverlay = true;
   uint16_t airportLabelKm = 50;
+  uint16_t adsbRefreshSec = 5;
 };
 
 class SettingsStore {

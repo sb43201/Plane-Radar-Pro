@@ -20,6 +20,7 @@ AppSettings SettingsStore::load() {
   s.scopeMode = prefs_.getBool("scope", true);
   s.airportOverlay = prefs_.getBool("aptOv", true);
   s.airportLabelKm = prefs_.getUShort("aptLbl", 50);
+  s.adsbRefreshSec = prefs_.getUShort("adsbSec", 5);
 
   bool rangeOk = false;
   for (size_t i = 0; i < Config::RANGE_OPTION_COUNT; ++i) {
@@ -37,6 +38,14 @@ AppSettings SettingsStore::load() {
     }
   }
   if (!labelOk) s.airportLabelKm = 50;
+  bool refreshOk = false;
+  for (size_t i = 0; i < Config::ADSB_REFRESH_OPTION_COUNT; ++i) {
+    if (s.adsbRefreshSec == Config::ADSB_REFRESH_OPTIONS_SEC[i]) {
+      refreshOk = true;
+      break;
+    }
+  }
+  if (!refreshOk) s.adsbRefreshSec = 5;
   if (s.displayRotation > 3) s.displayRotation = Config::DEFAULT_ROTATION;
   return s;
 }
@@ -56,6 +65,7 @@ void SettingsStore::save(const AppSettings &s) {
   prefs_.putBool("scope", s.scopeMode);
   prefs_.putBool("aptOv", s.airportOverlay);
   prefs_.putUShort("aptLbl", s.airportLabelKm);
+  prefs_.putUShort("adsbSec", s.adsbRefreshSec);
 }
 
 void SettingsStore::reset() {

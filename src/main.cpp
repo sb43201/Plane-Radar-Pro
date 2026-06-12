@@ -288,7 +288,7 @@ void maintainWiFi() {
 
 void refreshAdsbIfDue(bool force = false) {
   const uint32_t now = millis();
-  if (!force && now - lastAdsbMs < Config::ADSB_REFRESH_MS) return;
+  if (!force && now - lastAdsbMs < (uint32_t)settings.adsbRefreshSec * 1000UL) return;
   lastAdsbMs = now;
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -478,6 +478,19 @@ void handleUiEvent(const UIEvent &event) {
       settings.airportLabelKm = Config::AIRPORT_LABEL_OPTIONS[(index + 1) % Config::AIRPORT_LABEL_OPTION_COUNT];
       settingsStore.save(settings);
       Serial.printf("[settings] airportLabelKm=%u\n", settings.airportLabelKm);
+      break;
+    }
+    case UIAction::RefreshRateNext: {
+      size_t index = 0;
+      for (size_t i = 0; i < Config::ADSB_REFRESH_OPTION_COUNT; ++i) {
+        if (settings.adsbRefreshSec == Config::ADSB_REFRESH_OPTIONS_SEC[i]) {
+          index = i;
+          break;
+        }
+      }
+      settings.adsbRefreshSec = Config::ADSB_REFRESH_OPTIONS_SEC[(index + 1) % Config::ADSB_REFRESH_OPTION_COUNT];
+      settingsStore.save(settings);
+      Serial.printf("[settings] adsbRefreshSec=%u\n", settings.adsbRefreshSec);
       break;
     }
     case UIAction::LatPlus:

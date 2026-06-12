@@ -64,6 +64,8 @@ constexpr uint16_t RANGE_OPTIONS[] = {5, 10, 25, 50, 100};
 constexpr size_t RANGE_OPTION_COUNT = sizeof(RANGE_OPTIONS) / sizeof(RANGE_OPTIONS[0]);
 
 constexpr uint32_t ADSB_REFRESH_MS = 5000;
+constexpr uint16_t ADSB_REFRESH_OPTIONS_SEC[] = {5, 10, 15, 30};
+constexpr size_t ADSB_REFRESH_OPTION_COUNT = sizeof(ADSB_REFRESH_OPTIONS_SEC) / sizeof(ADSB_REFRESH_OPTIONS_SEC[0]);
 constexpr uint32_t WIFI_RECONNECT_MS = 10000;
 constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 60000;
 constexpr uint32_t WIFI_RESET_HOLD_MS = 3000;
