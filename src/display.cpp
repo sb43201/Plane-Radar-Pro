@@ -400,7 +400,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
 void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<Airport> &airports, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  const uint8_t maxRows = 8;
+  const uint8_t maxRows = 7;
   const uint8_t inRangeCount = airportInRangeCount(settings, airports);
   if (inRangeCount <= maxRows) airportListOffset_ = 0;
   else if (airportListOffset_ > inRangeCount - maxRows) airportListOffset_ = inRangeCount - maxRows;
@@ -438,14 +438,14 @@ void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<A
     tft_.drawString("No airports inside " + String(settings.rangeKm) + " km", tft_.width() / 2, tft_.height() / 2);
     tft_.setTextDatum(TL_DATUM);
   } else if (inRangeCount > maxRows) {
-    button(10, 406, 72, 28, "Up", airportListOffset_ > 0 ? panel(settings) : muted(settings), fg(settings));
-    button(tft_.width() - 82, 406, 72, 28, "Down",
+    button(10, 382, 86, 32, "Up", airportListOffset_ > 0 ? panel(settings) : muted(settings), fg(settings));
+    button(tft_.width() - 96, 382, 86, 32, "Down",
            airportListOffset_ + maxRows < inRangeCount ? accent(settings) : muted(settings), TFT_WHITE);
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.setTextDatum(MC_DATUM);
     tft_.drawString(String(airportListOffset_ + 1) + "-" + String(airportListOffset_ + row) + " / " +
                         String(inRangeCount),
-                    tft_.width() / 2, 392);
+                    tft_.width() / 2, 397);
     tft_.setTextDatum(TL_DATUM);
   }
   drawBottomNav(settings, ScreenId::AirportList);
@@ -816,7 +816,7 @@ String DisplayUI::hitAirportRow(int16_t x, int16_t y, const AppSettings &setting
   for (const Airport &airport : airports) {
     if (airport.distanceKm > settings.rangeKm) continue;
     if (skipped++ < airportListOffset_) continue;
-    if (row >= 8) break;
+    if (row >= 7) break;
     if (inRect(x, y, 8, 42 + row * 42, tft_.width() - 16, 36)) return AirportManager::displayCode(airport);
     row++;
   }
@@ -852,9 +852,9 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   if (!point.touched) return event;
 
   if (screen == ScreenId::AirportList) {
-    const uint8_t maxRows = 8;
+    const uint8_t maxRows = 7;
     const uint8_t inRangeCount = airportInRangeCount(settings, airports);
-    if (inRangeCount > maxRows && inRect(point.x, point.y, 2, 360, 118, 78)) {
+    if (inRangeCount > maxRows && inRect(point.x, point.y, 4, 374, 100, 48)) {
       if (airportListOffset_ > 0) {
         airportListOffset_--;
         dirty_ = true;
@@ -864,7 +864,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
       return event;
     }
-    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 120, 360, 118, 78)) {
+    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 104, 374, 100, 48)) {
       if (airportListOffset_ + maxRows < inRangeCount) {
         airportListOffset_++;
         dirty_ = true;
