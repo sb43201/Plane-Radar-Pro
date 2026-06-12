@@ -15,6 +15,7 @@ AppSettings SettingsStore::load() {
   s.touchMaxX = prefs_.getInt("tMaxX", Config::TOUCH_MAX_X);
   s.touchMinY = prefs_.getInt("tMinY", Config::TOUCH_MIN_Y);
   s.touchMaxY = prefs_.getInt("tMaxY", Config::TOUCH_MAX_Y);
+  s.touchCalibrated = prefs_.getBool("touchCal", false);
   s.gpsLogging = prefs_.getBool("gpsLog", false);
   s.scopeMode = prefs_.getBool("scope", true);
   s.airportOverlay = prefs_.getBool("aptOv", true);
@@ -50,6 +51,7 @@ void SettingsStore::save(const AppSettings &s) {
   prefs_.putInt("tMaxX", s.touchMaxX);
   prefs_.putInt("tMinY", s.touchMinY);
   prefs_.putInt("tMaxY", s.touchMaxY);
+  prefs_.putBool("touchCal", s.touchCalibrated);
   prefs_.putBool("gpsLog", s.gpsLogging);
   prefs_.putBool("scope", s.scopeMode);
   prefs_.putBool("aptOv", s.airportOverlay);

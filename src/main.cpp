@@ -47,10 +47,13 @@ RawTouchPoint calibrationPoints[4];
 uint8_t calibrationStep = 0;
 bool calibrationWaitingForRelease = false;
 bool airportCenterActive = false;
+bool startupCalibrationMode = false;
 
 void updateAircraftAlerts();
 void processGpsLogging();
 void updateAirports(bool force = false);
+void continueStartupAfterCalibration();
+void startTouchCalibration(bool startupMode);
 
 void markWifiPortalSaved() {
   wifiPortalSaved = true;
@@ -415,11 +418,7 @@ void handleUiEvent(const UIEvent &event) {
       break;
     }
     case UIAction::StartTouchCalibration:
-      currentScreen = ScreenId::TouchCalibration;
-      calibrationStep = 0;
-      calibrationWaitingForRelease = false;
-      display.drawTouchCalibration(settings, calibrationStep, false);
-      Serial.println("[touch-cal] calibration started");
+      startTouchCalibration(false);
       return;
     case UIAction::RangeNext:
       cycleRange();
@@ -495,24 +494,37 @@ void finishTouchCalibration() {
 
   if (abs(rightX - leftX) < 300 || abs(bottomY - topY) < 300) {
     Serial.println("[touch-cal] rejected calibration: points too close");
+    if (startupCalibrationMode) {
+      startTouchCalibration(true);
+      return;
+    }
     currentScreen = ScreenId::Settings;
     display.invalidate();
     return;
   }
 
-  settings.touchMinX = leftX < rightX ? min((int)calibrationPoints[0].x, (int)calibrationPoints[3].x)
-                                      : max((int)calibrationPoints[0].x, (int)calibrationPoints[3].x);
-  settings.touchMaxX = leftX < rightX ? max((int)calibrationPoints[1].x, (int)calibrationPoints[2].x)
-                                      : min((int)calibrationPoints[1].x, (int)calibrationPoints[2].x);
-  settings.touchMinY = topY < bottomY ? min((int)calibrationPoints[0].y, (int)calibrationPoints[1].y)
-                                      : max((int)calibrationPoints[0].y, (int)calibrationPoints[1].y);
-  settings.touchMaxY = topY < bottomY ? max((int)calibrationPoints[2].y, (int)calibrationPoints[3].y)
-                                      : min((int)calibrationPoints[2].y, (int)calibrationPoints[3].y);
+  const float targetLeft = 28.0f;
+  const float targetRight = Config::SCREEN_W - 28.0f;
+  const float targetTop = 60.0f;
+  const float targetBottom = Config::SCREEN_H - 28.0f;
+  const float xScale = (rightX - leftX) / (targetRight - targetLeft);
+  const float yScale = (bottomY - topY) / (targetBottom - targetTop);
+
+  settings.touchMinX = lroundf(leftX - xScale * targetLeft);
+  settings.touchMaxX = lroundf(leftX + xScale * ((Config::SCREEN_W - 1) - targetLeft));
+  settings.touchMinY = lroundf(topY - yScale * targetTop);
+  settings.touchMaxY = lroundf(topY + yScale * ((Config::SCREEN_H - 1) - targetTop));
+  settings.touchCalibrated = true;
   settingsStore.save(settings);
   Serial.printf("[touch-cal] saved x=(%d,%d) y=(%d,%d)\n", settings.touchMinX, settings.touchMaxX,
                 settings.touchMinY, settings.touchMaxY);
   display.drawTouchCalibration(settings, calibrationStep, true);
   delay(900);
+  if (startupCalibrationMode) {
+    startupCalibrationMode = false;
+    continueStartupAfterCalibration();
+    return;
+  }
   currentScreen = ScreenId::Settings;
   display.invalidate();
 }
@@ -598,6 +610,22 @@ void drawCurrentScreen(bool force = false) {
   }
 }
 
+void startTouchCalibration(bool startupMode) {
+  startupCalibrationMode = startupMode;
+  currentScreen = ScreenId::TouchCalibration;
+  calibrationStep = 0;
+  calibrationWaitingForRelease = false;
+  display.drawTouchCalibration(settings, calibrationStep, false);
+  Serial.printf("[touch-cal] calibration started%s\n", startupMode ? " at first boot" : "");
+}
+
+void continueStartupAfterCalibration() {
+  startWiFi();
+  refreshAdsbIfDue(true);
+  currentScreen = ScreenId::Radar;
+  drawCurrentScreen(true);
+}
+
 void setup() {
   Serial.begin(115200);
   delay(100);
@@ -619,9 +647,12 @@ void setup() {
   updateBatteryStatus(true);
   display.showSplash();
 
-  startWiFi();
-  refreshAdsbIfDue(true);
-  drawCurrentScreen(true);
+  if (!settings.touchCalibrated) {
+    startTouchCalibration(true);
+    return;
+  }
+
+  continueStartupAfterCalibration();
 }
 
 void loop() {

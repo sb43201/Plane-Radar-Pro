@@ -15,6 +15,7 @@ struct AppSettings {
   int touchMaxX = Config::TOUCH_MAX_X;
   int touchMinY = Config::TOUCH_MIN_Y;
   int touchMaxY = Config::TOUCH_MAX_Y;
+  bool touchCalibrated = false;
   bool gpsLogging = false;
   bool scopeMode = true;
   bool airportOverlay = true;
