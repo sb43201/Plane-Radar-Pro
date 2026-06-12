@@ -41,7 +41,7 @@ class AirportManager {
   double lastLat_ = NAN;
   double lastLon_ = NAN;
 
-  bool parseCsvLine(const String &line, Airport &airport) const;
-  static String csvField(const String &line, uint8_t targetIndex);
+  bool parseCsvLine(const char *line, Airport &airport) const;
+  static String csvField(const char *line, uint8_t targetIndex);
   void sortAndTrim();
 };

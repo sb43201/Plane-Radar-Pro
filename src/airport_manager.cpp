@@ -13,6 +13,14 @@ SPIClass sdSpi(VSPI);
 bool validPosition(double lat, double lon) {
   return !isnan(lat) && !isnan(lon) && lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0;
 }
+
+bool blankLine(const char *line) {
+  while (*line) {
+    if (*line != ' ' && *line != '\t' && *line != '\r' && *line != '\n') return false;
+    line++;
+  }
+  return true;
+}
 }  // namespace
 
 bool AirportManager::begin() {
@@ -50,20 +58,30 @@ bool AirportManager::loadNearby(double homeLat, double homeLon) {
     return false;
   }
 
-  Serial.println("[airport] Loaded airports.csv");
+  Serial.printf("[airport] Loaded airports.csv size=%u bytes\n", (unsigned)file.size());
   bool firstLine = true;
+  char line[512];
   while (file.available()) {
-    String line = file.readStringUntil('\n');
-    line.trim();
-    if (line.isEmpty()) continue;
+    const size_t len = file.readBytesUntil('\n', line, sizeof(line) - 1);
+    line[len] = '\0';
+    if (len == sizeof(line) - 1) {
+      while (file.available() && file.read() != '\n') yield();
+      Serial.println("[airport] skipped overlong CSV line");
+      continue;
+    }
+    if (blankLine(line)) continue;
     if (firstLine) {
       firstLine = false;
-      if (line.startsWith("ident,")) continue;
+      if (strncmp(line, "ident,", 6) == 0) continue;
     }
 
     Airport airport;
     if (!parseCsvLine(line, airport)) continue;
     parsedCount_++;
+    if (parsedCount_ % 1000 == 0) {
+      Serial.printf("[airport] parsed=%u nearby=%u\n", (unsigned)parsedCount_, (unsigned)airports_.size());
+      yield();
+    }
 
     airport.distanceKm = Radar::distanceKm(homeLat, homeLon, airport.lat, airport.lon);
     if (airport.distanceKm > Config::AIRPORT_LOAD_RADIUS_KM) continue;
@@ -131,7 +149,7 @@ String AirportManager::displayCode(const Airport &airport) {
   return airport.ident;
 }
 
-bool AirportManager::parseCsvLine(const String &line, Airport &airport) const {
+bool AirportManager::parseCsvLine(const char *line, Airport &airport) const {
   airport.ident = csvField(line, 0);
   airport.type = csvField(line, 1);
   airport.name = csvField(line, 2);
@@ -143,12 +161,14 @@ bool AirportManager::parseCsvLine(const String &line, Airport &airport) const {
   return airport.ident.length() && validPosition(airport.lat, airport.lon);
 }
 
-String AirportManager::csvField(const String &line, uint8_t targetIndex) {
+String AirportManager::csvField(const char *line, uint8_t targetIndex) {
   String field;
+  field.reserve(32);
   uint8_t index = 0;
   bool quoted = false;
-  for (size_t i = 0; i < line.length(); ++i) {
+  for (size_t i = 0; line[i] != '\0'; ++i) {
     const char c = line[i];
+    if (c == '\r' || c == '\n') break;
     if (c == '"') {
       quoted = !quoted;
       continue;
