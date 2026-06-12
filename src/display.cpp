@@ -382,27 +382,43 @@ void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<A
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
-  header(settings, "Airports", String(airports.size()) + " nearby");
+  header(settings, "Airports", "<= " + String(settings.rangeKm) + " km");
   if (airports.empty()) {
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.setTextDatum(MC_DATUM);
     tft_.drawString("No airport database", tft_.width() / 2, tft_.height() / 2);
     tft_.setTextDatum(TL_DATUM);
   }
-  const uint8_t maxRows = min((size_t)5, airports.size());
-  for (uint8_t row = 0; row < maxRows; ++row) {
-    const Airport &airport = airports[row];
-    const int16_t y = 42 + row * 50;
-    tft_.fillRoundRect(8, y, tft_.width() - 16, 44, 5, panel(settings));
+  uint8_t row = 0;
+  uint8_t inRangeCount = 0;
+  const uint8_t maxRows = 9;
+  for (const Airport &airport : airports) {
+    if (airport.distanceKm > settings.rangeKm) continue;
+    inRangeCount++;
+    if (row >= maxRows) continue;
+    const int16_t y = 42 + row * 42;
+    tft_.fillRoundRect(8, y, tft_.width() - 16, 36, 5, panel(settings));
     tft_.setTextColor(TFT_BLUE, panel(settings));
-    tft_.drawString(AirportManager::displayCode(airport), 16, y + 4);
+    tft_.drawString(AirportManager::displayCode(airport), 16, y + 3);
     tft_.setTextColor(fg(settings), panel(settings));
     String name = airport.name;
-    if (name.length() > 18) name = name.substring(0, 18);
-    tft_.drawString(name, 62, y + 4);
+    if (name.length() > 20) name = name.substring(0, 20);
+    tft_.drawString(name, 62, y + 3);
     tft_.setTextColor(muted(settings), panel(settings));
-    tft_.drawString(String(airport.distanceKm, 0) + " km", 62, y + 22);
-    tft_.drawString(String(airport.bearingDeg, 0) + " deg", 132, y + 22);
+    tft_.drawString(String(airport.distanceKm, 1) + " km", 62, y + 19);
+    tft_.drawString(String(airport.bearingDeg, 0) + " deg", 144, y + 19);
+    row++;
+  }
+  if (!airports.empty() && inRangeCount == 0) {
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.drawString("No airports inside " + String(settings.rangeKm) + " km", tft_.width() / 2, tft_.height() / 2);
+    tft_.setTextDatum(TL_DATUM);
+  } else if (inRangeCount > maxRows) {
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(TR_DATUM);
+    tft_.drawString("showing " + String(maxRows) + "/" + String(inRangeCount), tft_.width() - 10, 424);
+    tft_.setTextDatum(TL_DATUM);
   }
   drawBottomNav(settings, ScreenId::AirportList);
 }
@@ -644,20 +660,24 @@ void DisplayUI::drawTouchCalibration(const AppSettings &settings, uint8_t step, 
 void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStatus, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  tft_.fillScreen(bg(settings));
+  const uint16_t settingsBg = settings.nightMode ? 0x0841 : bg(settings);
+  const uint16_t settingsPanel = settings.nightMode ? 0x2104 : panel(settings);
+  const uint16_t settingsText = settings.nightMode ? TFT_WHITE : fg(settings);
+  const uint16_t settingsMuted = settings.nightMode ? 0xBDF7 : muted(settings);
+  tft_.fillScreen(settingsBg);
   String right = "WiFi " + wifiStatus;
   if (right.length() > 20) right = right.substring(0, 20);
   header(settings, "Settings", right);
-  tft_.setTextColor(fg(settings), bg(settings));
+  tft_.setTextColor(settingsText, settingsBg);
   tft_.setTextFont(2);
   tft_.drawString("Latitude", 16, 48);
   tft_.drawString(String(settings.homeLat, 5), 110, 48);
-  button(226, 42, 36, 28, "-", panel(settings), fg(settings));
+  button(226, 42, 36, 28, "-", settingsPanel, settingsText);
   button(270, 42, 36, 28, "+", accent(settings), TFT_WHITE);
 
   tft_.drawString("Longitude", 16, 88);
   tft_.drawString(String(settings.homeLon, 5), 110, 88);
-  button(226, 82, 36, 28, "-", panel(settings), fg(settings));
+  button(226, 82, 36, 28, "-", settingsPanel, settingsText);
   button(270, 82, 36, 28, "+", accent(settings), TFT_WHITE);
 
   tft_.drawString("Range", 16, 128);
@@ -670,21 +690,21 @@ void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStat
 
   tft_.drawString("GPS Log", 16, 208);
   button(110, 202, 86, 28, settings.gpsLogging ? "Log On" : "Log Off",
-         settings.gpsLogging ? TFT_GREEN : panel(settings), settings.gpsLogging ? TFT_BLACK : fg(settings));
+         settings.gpsLogging ? TFT_GREEN : settingsPanel, settings.gpsLogging ? TFT_BLACK : settingsText);
   button(206, 202, 100, 28, "Cal Touch", accent(settings), TFT_WHITE);
 
   tft_.drawString("Airports", 16, 248);
   button(110, 242, 86, 28, settings.airportOverlay ? "Apt On" : "Apt Off",
-         settings.airportOverlay ? TFT_GREEN : panel(settings), settings.airportOverlay ? TFT_BLACK : fg(settings));
+         settings.airportOverlay ? TFT_GREEN : settingsPanel, settings.airportOverlay ? TFT_BLACK : settingsText);
   button(206, 242, 100, 28, String(settings.airportLabelKm) + "km", accent(settings), TFT_WHITE);
 
-  tft_.setTextColor(fg(settings), bg(settings));
+  tft_.setTextColor(settingsText, settingsBg);
   tft_.setTextFont(2);
   tft_.drawString("Refresh", 16, 288);
   button(206, 282, 100, 28, String(settings.adsbRefreshSec) + " sec", accent(settings), TFT_WHITE);
 
   button(10, 334, 96, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
-  button(112, 334, 86, 30, "Reboot", panel(settings), fg(settings));
+  button(112, 334, 86, 30, "Reboot", settingsPanel, settingsText);
   button(204, 334, 106, 30, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
 }
@@ -709,10 +729,14 @@ String DisplayUI::hitAircraft(int16_t x, int16_t y, const AppSettings &settings,
   return "";
 }
 
-String DisplayUI::hitAirportRow(int16_t x, int16_t y, const std::vector<Airport> &airports) {
-  const uint8_t maxRows = min((size_t)5, airports.size());
-  for (uint8_t row = 0; row < maxRows; ++row) {
-    if (inRect(x, y, 8, 42 + row * 50, tft_.width() - 16, 44)) return AirportManager::displayCode(airports[row]);
+String DisplayUI::hitAirportRow(int16_t x, int16_t y, const AppSettings &settings,
+                                const std::vector<Airport> &airports) {
+  uint8_t row = 0;
+  for (const Airport &airport : airports) {
+    if (airport.distanceKm > settings.rangeKm) continue;
+    if (row >= 9) break;
+    if (inRect(x, y, 8, 42 + row * 42, tft_.width() - 16, 36)) return AirportManager::displayCode(airport);
+    row++;
   }
   return "";
 }
@@ -758,7 +782,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
     }
   } else if (screen == ScreenId::AirportList) {
-    event.airportCode = hitAirportRow(point.x, point.y, airports);
+    event.airportCode = hitAirportRow(point.x, point.y, settings, airports);
     if (event.airportCode.length()) {
       selectedAirportCode_ = event.airportCode;
       event.action = UIAction::ShowAirportDetail;

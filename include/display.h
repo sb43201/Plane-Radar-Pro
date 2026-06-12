@@ -91,5 +91,5 @@ class DisplayUI {
   void drawBottomNav(const AppSettings &settings, ScreenId active);
   const Aircraft *findAircraft(const std::vector<Aircraft> &aircraft, const String &hex) const;
   String hitAircraft(int16_t x, int16_t y, const AppSettings &settings, const std::vector<Aircraft> &aircraft);
-  String hitAirportRow(int16_t x, int16_t y, const std::vector<Airport> &airports);
+  String hitAirportRow(int16_t x, int16_t y, const AppSettings &settings, const std::vector<Airport> &airports);
 };
