@@ -93,6 +93,7 @@ class DisplayUI {
   bool dirty_ = true;
   String selectedHex_;
   String selectedAirportCode_;
+  uint8_t aircraftListOffset_ = 0;
   uint8_t airportListOffset_ = 0;
 
   uint16_t bg(const AppSettings &settings) const;

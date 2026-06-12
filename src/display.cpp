@@ -242,12 +242,13 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
                           const String &airportStatus, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  const uint16_t scopeBg = settings.scopeMode ? TFT_BLACK : bg(settings);
-  const uint16_t grid = settings.scopeMode ? 0x07E0 : accent(settings);
-  const uint16_t gridDim = settings.scopeMode ? 0x03A0 : muted(settings);
-  const uint16_t text = settings.scopeMode ? 0xB7FF : fg(settings);
-  const uint16_t dimText = settings.scopeMode ? 0x7BEF : muted(settings);
-  const uint16_t airportColor = settings.scopeMode ? TFT_MAGENTA : TFT_ORANGE;
+  const bool scopeStyle = settings.scopeMode && settings.nightMode;
+  const uint16_t scopeBg = scopeStyle ? TFT_BLACK : bg(settings);
+  const uint16_t grid = scopeStyle ? 0x07E0 : accent(settings);
+  const uint16_t gridDim = scopeStyle ? 0x03A0 : muted(settings);
+  const uint16_t text = scopeStyle ? 0xB7FF : fg(settings);
+  const uint16_t dimText = scopeStyle ? 0x7BEF : muted(settings);
+  const uint16_t airportColor = scopeStyle ? TFT_MAGENTA : TFT_ORANGE;
   const int16_t navY = tft_.height() - 38;
   tft_.startWrite();
   if (force) {
@@ -260,8 +261,8 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   const int16_t cy = 190;
   const int16_t radius = min((int16_t)132, (int16_t)((tft_.width() - 42) / 2));
 
-  tft_.drawCircle(cx, cy, radius + 5, settings.scopeMode ? 0x39E7 : gridDim);
-  tft_.drawCircle(cx, cy, radius + 2, settings.scopeMode ? 0x18E3 : panel(settings));
+  tft_.drawCircle(cx, cy, radius + 5, scopeStyle ? 0x39E7 : gridDim);
+  tft_.drawCircle(cx, cy, radius + 2, scopeStyle ? 0x18E3 : panel(settings));
   for (uint8_t ring = 1; ring <= 4; ++ring) {
     tft_.drawCircle(cx, cy, radius * ring / 4, gridDim);
   }
@@ -351,7 +352,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   if (gpsCompass.length()) {
     const int16_t compassY = 52;
     const int16_t compassX = tft_.width() - 92;
-    const uint16_t compassFill = settings.scopeMode ? 0x0841 : panel(settings);
+    const uint16_t compassFill = scopeStyle ? 0x0841 : panel(settings);
     tft_.fillRoundRect(compassX, compassY, 86, 20, 4, compassFill);
     tft_.setTextColor(text, compassFill);
     tft_.setTextDatum(MC_DATUM);
@@ -368,7 +369,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   }
 
   const int16_t statsY = cy + radius + 18;
-  const uint16_t statFill = settings.scopeMode ? 0x0841 : panel(settings);
+  const uint16_t statFill = scopeStyle ? 0x0841 : panel(settings);
   tft_.fillRoundRect(10, statsY, tft_.width() - 20, 92, 6, statFill);
   tft_.setTextDatum(MC_DATUM);
   tft_.setTextFont(4);
@@ -559,16 +560,20 @@ void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<
   tft_.setTextColor(muted(settings), bg(settings));
   tft_.drawString(lastUpdateText, 12, 104);
 
-  auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, 6);
+  auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, aircraft.size());
+  const uint8_t maxRows = 5;
+  if (order.size() <= maxRows) aircraftListOffset_ = 0;
+  else if (aircraftListOffset_ > order.size() - maxRows) aircraftListOffset_ = order.size() - maxRows;
+
   if (order.empty()) {
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.setTextDatum(MC_DATUM);
     tft_.drawString("No aircraft in range", tft_.width() / 2, tft_.height() / 2 + 24);
     tft_.setTextDatum(TL_DATUM);
   }
-  const uint8_t maxRows = min((size_t)5, order.size());
-  for (uint8_t row = 0; row < maxRows; ++row) {
-    const Aircraft &a = aircraft[order[row]];
+  const uint8_t visibleRows = min((size_t)maxRows, order.size());
+  for (uint8_t row = 0; row < visibleRows; ++row) {
+    const Aircraft &a = aircraft[order[aircraftListOffset_ + row]];
     const int16_t y = 118 + row * 48;
     tft_.fillRoundRect(8, y, tft_.width() - 16, 44, 5, panel(settings));
     tft_.fillCircle(22, y + 15, 6, altitudeColor(a.altBaro));
@@ -582,6 +587,18 @@ void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<
     tft_.drawString(altText(a.altBaro), 218, y + 4);
     tft_.setTextColor(muted(settings), panel(settings));
     tft_.drawString(speedText(a.groundSpeed), 150, y + 22);
+  }
+  if (order.size() > maxRows) {
+    button(10, 382, 86, 32, "Up", aircraftListOffset_ > 0 ? panel(settings) : muted(settings), fg(settings));
+    button(tft_.width() - 96, 382, 86, 32, "Down",
+           aircraftListOffset_ + maxRows < order.size() ? accent(settings) : muted(settings), TFT_WHITE);
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.setTextFont(1);
+    tft_.drawString(String(aircraftListOffset_ + 1) + "-" + String(aircraftListOffset_ + visibleRows) + " / " +
+                        String(order.size()),
+                    tft_.width() / 2, 397);
+    tft_.setTextDatum(TL_DATUM);
   }
   drawBottomNav(settings, ScreenId::AircraftList);
 }
@@ -848,6 +865,33 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   UIEvent event;
   if (!point.touched) return event;
 
+  if (screen == ScreenId::AircraftList) {
+    auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, aircraft.size());
+    const uint8_t maxRows = 5;
+    if (order.size() <= maxRows) aircraftListOffset_ = 0;
+    else if (aircraftListOffset_ > order.size() - maxRows) aircraftListOffset_ = order.size() - maxRows;
+    if (order.size() > maxRows && inRect(point.x, point.y, 4, 374, 100, 48)) {
+      if (aircraftListOffset_ > 0) {
+        aircraftListOffset_--;
+        dirty_ = true;
+        Serial.printf("[ui] aircraft list scroll up offset=%u\n", aircraftListOffset_);
+      } else {
+        Serial.println("[ui] aircraft list already at top");
+      }
+      return event;
+    }
+    if (order.size() > maxRows && inRect(point.x, point.y, tft_.width() - 104, 374, 100, 48)) {
+      if (aircraftListOffset_ + maxRows < order.size()) {
+        aircraftListOffset_++;
+        dirty_ = true;
+        Serial.printf("[ui] aircraft list scroll down offset=%u\n", aircraftListOffset_);
+      } else {
+        Serial.println("[ui] aircraft list already at bottom");
+      }
+      return event;
+    }
+  }
+
   if (screen == ScreenId::AirportList) {
     const uint8_t maxRows = 8;
     const uint8_t inRangeCount = airportInRangeCount(settings, airports);
@@ -897,11 +941,13 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       dirty_ = true;
     }
   } else if (screen == ScreenId::AircraftList) {
-    auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, 6);
+    auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, aircraft.size());
     const uint8_t maxRows = min((size_t)5, order.size());
+    if (order.size() <= maxRows) aircraftListOffset_ = 0;
+    else if (aircraftListOffset_ > order.size() - maxRows) aircraftListOffset_ = order.size() - maxRows;
     for (uint8_t row = 0; row < maxRows; ++row) {
       if (inRect(point.x, point.y, 8, 118 + row * 48, tft_.width() - 16, 44)) {
-        event.aircraftHex = aircraft[order[row]].hex;
+        event.aircraftHex = aircraft[order[aircraftListOffset_ + row]].hex;
         selectedHex_ = event.aircraftHex;
         event.action = UIAction::ShowDetail;
         dirty_ = true;
