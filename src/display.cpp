@@ -616,15 +616,17 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   if (!point.touched) return event;
 
   const int16_t navY = tft_.height() - 38;
-  const int16_t gap = 4;
-  const int16_t navW = (tft_.width() - gap * 6) / 5;
-  if (inRect(point.x, point.y, gap, navY + 5, navW, 28)) event.action = UIAction::ShowRadar;
-  else if (inRect(point.x, point.y, gap * 2 + navW, navY + 5, navW, 28)) event.action = UIAction::ShowList;
-  else if (inRect(point.x, point.y, gap * 3 + navW * 2, navY + 5, navW, 28)) event.action = UIAction::ShowAirportList;
-  else if (inRect(point.x, point.y, gap * 4 + navW * 3, navY + 5, navW, 28)) event.action = UIAction::RangeNext;
-  else if (inRect(point.x, point.y, gap * 5 + navW * 4, navY + 5, navW, 28)) event.action = UIAction::ShowSettings;
+  if (point.y >= navY - 10) {
+    const int16_t w = tft_.width();
+    if (point.x < w * 18 / 100) event.action = UIAction::ShowRadar;
+    else if (point.x < w * 38 / 100) event.action = UIAction::ShowList;
+    else if (point.x < w * 56 / 100) event.action = UIAction::ShowAirportList;
+    else if (point.x < w * 74 / 100) event.action = UIAction::RangeNext;
+    else event.action = UIAction::ShowSettings;
+  }
 
   if (event.action != UIAction::None) {
+    Serial.printf("[ui] bottom nav x=%d y=%d action=%u\n", point.x, point.y, (unsigned)event.action);
     dirty_ = true;
     return event;
   }
