@@ -16,6 +16,12 @@ On first boot, connect your phone to the `PlaneRadar-Setup` captive portal and o
 
 To clear saved WiFi, open `Setup` on the touchscreen and hold `Reset WiFi` for 3 seconds. The ESP32 clears the saved credentials, restarts, and opens `PlaneRadar-Setup`.
 
+Hotspot tips:
+
+- ESP32 only sees 2.4 GHz WiFi. Enable iPhone `Maximize Compatibility` or set Android hotspot band to `2.4 GHz`.
+- If your phone cannot broadcast its hotspot while connected to `PlaneRadar-Setup`, use a second phone/laptop to open the setup portal.
+- To switch between home WiFi and phone hotspot without resetting credentials, set the phone hotspot SSID and password to exactly match the home WiFi SSID and password. The ESP32 will connect to whichever one is available.
+
 ## Hardware
 
 LCD:

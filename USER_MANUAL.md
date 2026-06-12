@@ -178,6 +178,37 @@ Setup flow:
 
 Future boots retry the saved hotspot for up to 60 seconds before opening setup mode again.
 
+Phone hotspot notes:
+
+- ESP32 WiFi is 2.4 GHz only. If your phone hotspot is 5 GHz only, it will not appear in the setup portal.
+- On iPhone, turn on `Maximize Compatibility` in Personal Hotspot.
+- On Android, set the hotspot AP band to `2.4 GHz` when that option is available.
+- Keep the hotspot screen open while scanning if your phone sleeps or disables discovery.
+- Some phones cannot broadcast a hotspot while also connected to `PlaneRadar-Setup`. In that case, use two devices:
+  1. Phone A: turn on hotspot.
+  2. Phone/laptop B: connect to `PlaneRadar-Setup`.
+  3. On Phone/laptop B, open `192.168.4.1`.
+  4. Select Phone A's hotspot SSID and save.
+
+## Switching Between Home WiFi And Phone Hotspot
+
+Plane Radar Pro uses the ESP32's saved station credentials. In normal WiFiManager mode, the ESP32 stores one WiFi SSID/password pair at a time.
+
+Best no-reset method:
+
+1. Set your phone hotspot name/SSID to exactly match your home WiFi SSID.
+2. Set your phone hotspot password to exactly match your home WiFi password.
+3. When you are home, leave the phone hotspot off and Plane Radar Pro connects to home WiFi.
+4. When traveling, turn on the phone hotspot and Plane Radar Pro connects to the hotspot using the same saved credentials.
+
+To switch to a different SSID/password:
+
+1. Tap `Setup`.
+2. Hold `Reset WiFi` for 3 seconds.
+3. Reconnect to `PlaneRadar-Setup`.
+4. Open `192.168.4.1`.
+5. Select the new WiFi or hotspot and save.
+
 ## Reset WiFi
 
 To clear saved WiFi credentials:
