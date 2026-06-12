@@ -535,6 +535,22 @@ void handleUiEvent(const UIEvent &event) {
       Serial.printf("[settings] adsbRefreshSec=%u\n", settings.adsbRefreshSec);
       break;
     }
+    case UIAction::UseGpsHome:
+      if (gps.hasFix()) {
+        airportCenterActive = false;
+        settings.homeLat = gps.latitude();
+        settings.homeLon = gps.longitude();
+        settingsStore.save(settings);
+        lastAdsbMs = 0;
+        updateAirports(true);
+        refreshAdsbIfDue(true);
+        currentScreen = ScreenId::Radar;
+        Serial.printf("[gps] home set from GPS %.6f, %.6f\n", settings.homeLat, settings.homeLon);
+      } else {
+        lastUpdateText = "No GPS fix";
+        Serial.println("[gps] Use GPS requested but no fix is available");
+      }
+      break;
     case UIAction::LatPlus:
       airportCenterActive = false;
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);

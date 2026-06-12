@@ -357,9 +357,12 @@ Settings screen:
 | Airport Label Distance | Cycle 10, 25, 50, 100, 150 km |
 | Cal Touch | Start four-point touchscreen calibration |
 | Log On / Log Off | Toggle GPS location logging |
+| Use GPS | Set home/radar center to the current GPS fix |
 | WiFi | Open multi-network WiFi Settings |
 | Reset / Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
+
+When GPS has a fix, Plane Radar Pro normally uses the GPS position as home. If you tap an airport and choose `Center Radar Here`, the radar stays centered on that airport. To return to your GPS location, open `Setup` and tap `Use GPS`.
 
 ## Touchscreen Calibration
 

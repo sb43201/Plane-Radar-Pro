@@ -76,6 +76,8 @@ const char *uiActionName(UIAction action) {
       return "AirportLabelNext";
     case UIAction::RefreshRateNext:
       return "RefreshRateNext";
+    case UIAction::UseGpsHome:
+      return "UseGpsHome";
     case UIAction::LatPlus:
       return "LatPlus";
     case UIAction::LatMinus:
@@ -757,6 +759,7 @@ void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStat
 
   settingsTextMode();
   tft_.drawString("Refresh", 16, 288);
+  button(110, 282, 86, 28, "Use GPS", settingsPanel, settingsText);
   button(206, 282, 100, 28, String(settings.adsbRefreshSec) + " sec", settingsAccent, TFT_WHITE);
 
   button(10, 334, 72, 30, "Reset", TFT_RED, TFT_WHITE);
@@ -1017,6 +1020,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inRect(point.x, point.y, 206, 202, 100, 28)) event.action = UIAction::StartTouchCalibration;
     else if (inRect(point.x, point.y, 110, 242, 86, 28)) event.action = UIAction::ToggleAirportOverlay;
     else if (inRect(point.x, point.y, 206, 242, 100, 28)) event.action = UIAction::AirportLabelNext;
+    else if (inRect(point.x, point.y, 110, 282, 86, 28)) event.action = UIAction::UseGpsHome;
     else if (inRect(point.x, point.y, 206, 282, 100, 28)) event.action = UIAction::RefreshRateNext;
     else if (inRect(point.x, point.y, 10, 334, 72, 30)) event.action = UIAction::ResetWiFiHold;
     else if (inRect(point.x, point.y, 88, 334, 68, 30)) event.action = UIAction::ShowWiFiSettings;

@@ -39,6 +39,7 @@ enum class UIAction : uint8_t {
   ToggleAirportOverlay,
   AirportLabelNext,
   RefreshRateNext,
+  UseGpsHome,
   LatPlus,
   LatMinus,
   LonPlus,
