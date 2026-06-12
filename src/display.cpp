@@ -225,7 +225,13 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   const uint16_t text = settings.scopeMode ? 0xB7FF : fg(settings);
   const uint16_t dimText = settings.scopeMode ? 0x7BEF : muted(settings);
   const uint16_t airportColor = settings.scopeMode ? TFT_MAGENTA : TFT_ORANGE;
-  tft_.fillScreen(scopeBg);
+  const int16_t navY = tft_.height() - 38;
+  tft_.startWrite();
+  if (force) {
+    tft_.fillScreen(scopeBg);
+  } else {
+    tft_.fillRect(0, 0, tft_.width(), navY, scopeBg);
+  }
 
   const int16_t cx = tft_.width() / 2;
   const int16_t cy = 190;
@@ -341,7 +347,20 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     tft_.setTextDatum(TL_DATUM);
   }
 
-  drawBottomNav(settings, ScreenId::Radar);
+  const int16_t statsY = cy + radius + 24;
+  const uint16_t statFill = settings.scopeMode ? 0x0841 : panel(settings);
+  tft_.fillRoundRect(10, statsY, tft_.width() - 20, 58, 6, statFill);
+  tft_.setTextDatum(MC_DATUM);
+  tft_.setTextFont(4);
+  tft_.setTextColor(text, statFill);
+  tft_.drawString(String(settings.rangeKm) + " km", tft_.width() / 2, statsY + 18);
+  tft_.setTextFont(2);
+  tft_.setTextColor(dimText, statFill);
+  tft_.drawString("RANGE     AC " + String(aircraft.size()), tft_.width() / 2, statsY + 43);
+  tft_.setTextDatum(TL_DATUM);
+
+  if (force) drawBottomNav(settings, ScreenId::Radar);
+  tft_.endWrite();
 }
 
 void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<Airport> &airports, bool force) {
