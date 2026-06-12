@@ -31,7 +31,6 @@ String wifiStatus = "boot";
 String lastUpdateText = "No update";
 uint32_t lastAdsbMs = 0;
 uint32_t lastReconnectMs = 0;
-uint32_t lastClockMs = 0;
 uint32_t lastBatteryMs = 0;
 uint32_t lastGpsLogMs = 0;
 bool timeConfigured = false;
@@ -42,6 +41,7 @@ uint32_t resetWiFiLastTouchMs = 0;
 String gpsStatus = "No GPS";
 String gpsCompassStatus = "";
 String batteryStatus = "Bat --";
+float lastBatteryVolts = NAN;
 String alertStatus = "";
 RawTouchPoint calibrationPoints[4];
 uint8_t calibrationStep = 0;
@@ -133,8 +133,10 @@ void updateBatteryStatus(bool force = false) {
   millivolts /= Config::BATTERY_ADC_SAMPLES;
 
   const float batteryVolts = (millivolts / 1000.0f) * Config::BATTERY_ADC_DIVIDER;
-  String newStatus = "Bat " + String(batteryVolts, 2) + "V";
-  if (newStatus != batteryStatus) {
+  String newStatus = "Bat " + String(batteryVolts, 1) + "V";
+  const bool meaningfulChange = isnan(lastBatteryVolts) || fabsf(batteryVolts - lastBatteryVolts) >= 0.08f;
+  if (force || (newStatus != batteryStatus && meaningfulChange)) {
+    lastBatteryVolts = batteryVolts;
     batteryStatus = newStatus;
     display.invalidate();
     Serial.printf("[battery] adc=%lu mV battery=%.2f V\n", millivolts, batteryVolts);
@@ -701,11 +703,5 @@ void loop() {
     return;
   }
 
-  const uint32_t now = millis();
-  if (now - lastClockMs >= Config::UI_CLOCK_MS) {
-    lastClockMs = now;
-    drawCurrentScreen(true);
-  } else {
-    drawCurrentScreen();
-  }
+  drawCurrentScreen();
 }
