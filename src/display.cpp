@@ -851,6 +851,31 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   UIEvent event;
   if (!point.touched) return event;
 
+  if (screen == ScreenId::AirportList) {
+    const uint8_t maxRows = 8;
+    const uint8_t inRangeCount = airportInRangeCount(settings, airports);
+    if (inRangeCount > maxRows && inRect(point.x, point.y, 2, 396, 92, 42)) {
+      if (airportListOffset_ > 0) {
+        airportListOffset_--;
+        dirty_ = true;
+        Serial.printf("[ui] airport list scroll up offset=%u\n", airportListOffset_);
+      } else {
+        Serial.println("[ui] airport list already at top");
+      }
+      return event;
+    }
+    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 94, 396, 92, 42)) {
+      if (airportListOffset_ + maxRows < inRangeCount) {
+        airportListOffset_++;
+        dirty_ = true;
+        Serial.printf("[ui] airport list scroll down offset=%u\n", airportListOffset_);
+      } else {
+        Serial.println("[ui] airport list already at bottom");
+      }
+      return event;
+    }
+  }
+
   const int16_t navY = tft_.height() - 38;
   if (point.y >= navY - 10) {
     const int16_t w = tft_.width();
@@ -887,24 +912,6 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
     }
   } else if (screen == ScreenId::AirportList) {
-    const uint8_t maxRows = 8;
-    const uint8_t inRangeCount = airportInRangeCount(settings, airports);
-    if (inRangeCount > maxRows && inRect(point.x, point.y, 2, 396, 92, 42)) {
-      if (airportListOffset_ > 0) {
-        airportListOffset_--;
-        dirty_ = true;
-        Serial.printf("[ui] airport list scroll up offset=%u\n", airportListOffset_);
-      }
-      return event;
-    }
-    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 94, 396, 92, 42)) {
-      if (airportListOffset_ + maxRows < inRangeCount) {
-        airportListOffset_++;
-        dirty_ = true;
-        Serial.printf("[ui] airport list scroll down offset=%u\n", airportListOffset_);
-      }
-      return event;
-    }
     event.airportCode = hitAirportRow(point.x, point.y, settings, airports);
     if (event.airportCode.length()) {
       selectedAirportCode_ = event.airportCode;
