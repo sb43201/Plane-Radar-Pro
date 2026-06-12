@@ -315,6 +315,17 @@ Aircraft altitude colors:
 | Yellow | 5000 to 20000 ft |
 | Green | Above 20000 ft |
 
+Aircraft marker shapes:
+
+| Marker | Meaning |
+| --- | --- |
+| Rotated triangle | Aircraft position and track/heading |
+| Circle around triangle | Contrast ring to make the aircraft visible, especially in daylight mode |
+| Double/thicker circle | Selected aircraft |
+| Red edge marker | Aircraft just outside the selected radar range |
+
+The circle around an aircraft is not an alert by itself. Alerts are shown in the alert banner below the radar scope.
+
 Tap an aircraft icon to open the aircraft detail page.
 
 ## Controls
