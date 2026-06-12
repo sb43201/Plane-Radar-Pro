@@ -81,6 +81,8 @@ const char *uiActionName(UIAction action) {
       return "LonMinus";
     case UIAction::SaveSettings:
       return "SaveSettings";
+    case UIAction::RebootDevice:
+      return "RebootDevice";
     case UIAction::ResetWiFiHold:
       return "ResetWiFiHold";
   }
@@ -672,8 +674,9 @@ void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
          settings.airportOverlay ? TFT_GREEN : panel(settings), settings.airportOverlay ? TFT_BLACK : fg(settings));
   button(206, 242, 100, 28, String(settings.airportLabelKm) + "km", accent(settings), TFT_WHITE);
 
-  button(16, 292, 132, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
-  button(172, 292, 132, 30, "Save", TFT_GREEN, TFT_BLACK);
+  button(10, 292, 96, 30, "Reset WiFi", TFT_RED, TFT_WHITE);
+  button(112, 292, 86, 30, "Reboot", panel(settings), fg(settings));
+  button(204, 292, 106, 30, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
 }
 
@@ -771,8 +774,9 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inRect(point.x, point.y, 206, 202, 100, 28)) event.action = UIAction::StartTouchCalibration;
     else if (inRect(point.x, point.y, 110, 242, 86, 28)) event.action = UIAction::ToggleAirportOverlay;
     else if (inRect(point.x, point.y, 206, 242, 100, 28)) event.action = UIAction::AirportLabelNext;
-    else if (inRect(point.x, point.y, 16, 292, 132, 30)) event.action = UIAction::ResetWiFiHold;
-    else if (inRect(point.x, point.y, 172, 292, 132, 30)) event.action = UIAction::SaveSettings;
+    else if (inRect(point.x, point.y, 10, 292, 96, 30)) event.action = UIAction::ResetWiFiHold;
+    else if (inRect(point.x, point.y, 112, 292, 86, 30)) event.action = UIAction::RebootDevice;
+    else if (inRect(point.x, point.y, 204, 292, 106, 30)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }
   return event;

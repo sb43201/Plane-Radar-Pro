@@ -40,6 +40,7 @@ enum class UIAction : uint8_t {
   LonPlus,
   LonMinus,
   SaveSettings,
+  RebootDevice,
   ResetWiFiHold
 };
 

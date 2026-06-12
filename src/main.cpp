@@ -503,6 +503,11 @@ void handleUiEvent(const UIEvent &event) {
       lastAdsbMs = 0;
       Serial.printf("[settings] saved home=(%.5f, %.5f)\n", settings.homeLat, settings.homeLon);
       break;
+    case UIAction::RebootDevice:
+      Serial.println("[system] reboot requested from settings");
+      delay(150);
+      ESP.restart();
+      break;
     case UIAction::ResetWiFiHold:
       break;
   }
