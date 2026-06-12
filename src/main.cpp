@@ -672,6 +672,10 @@ void loop() {
   UIEvent event = display.handleTouch(point, currentScreen, settings, aircraft, airportManager.airports());
   processResetWiFiHold(event);
   handleUiEvent(event);
+  if (event.action != UIAction::None) {
+    drawCurrentScreen(true);
+    return;
+  }
 
   const uint32_t now = millis();
   if (now - lastClockMs >= Config::UI_CLOCK_MS) {

@@ -39,6 +39,54 @@ float angleDiff(float a, float b) {
   return diff > 180.0f ? 360.0f - diff : diff;
 }
 
+const char *uiActionName(UIAction action) {
+  switch (action) {
+    case UIAction::None:
+      return "None";
+    case UIAction::ShowRadar:
+      return "ShowRadar";
+    case UIAction::ShowList:
+      return "ShowList";
+    case UIAction::ShowAirportList:
+      return "ShowAirportList";
+    case UIAction::ShowSettings:
+      return "ShowSettings";
+    case UIAction::ShowDetail:
+      return "ShowDetail";
+    case UIAction::ShowAirportDetail:
+      return "ShowAirportDetail";
+    case UIAction::CenterOnAirport:
+      return "CenterOnAirport";
+    case UIAction::StartTouchCalibration:
+      return "StartTouchCalibration";
+    case UIAction::RangeNext:
+      return "RangeNext";
+    case UIAction::ToggleTheme:
+      return "ToggleTheme";
+    case UIAction::ToggleGpsLogging:
+      return "ToggleGpsLogging";
+    case UIAction::ToggleRadarMode:
+      return "ToggleRadarMode";
+    case UIAction::ToggleAirportOverlay:
+      return "ToggleAirportOverlay";
+    case UIAction::AirportLabelNext:
+      return "AirportLabelNext";
+    case UIAction::LatPlus:
+      return "LatPlus";
+    case UIAction::LatMinus:
+      return "LatMinus";
+    case UIAction::LonPlus:
+      return "LonPlus";
+    case UIAction::LonMinus:
+      return "LonMinus";
+    case UIAction::SaveSettings:
+      return "SaveSettings";
+    case UIAction::ResetWiFiHold:
+      return "ResetWiFiHold";
+  }
+  return "Unknown";
+}
+
 void drawEdgeMarker(TFT_eSPI &tft, int16_t cx, int16_t cy, int16_t radius, float bearingDeg, float distanceKm,
                     uint16_t bgColor) {
   const float angle = bearingDeg * PI / 180.0f;
@@ -626,7 +674,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   }
 
   if (event.action != UIAction::None) {
-    Serial.printf("[ui] bottom nav x=%d y=%d action=%u\n", point.x, point.y, (unsigned)event.action);
+    Serial.printf("[ui] bottom nav x=%d y=%d action=%s\n", point.x, point.y, uiActionName(event.action));
     dirty_ = true;
     return event;
   }
