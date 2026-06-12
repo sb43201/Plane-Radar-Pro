@@ -240,6 +240,8 @@ Controls:
 | Import | Loads `/wifi_config.json` from SD card |
 | Reset WiFi | Hold 3 seconds to clear all saved WiFi |
 
+The `On/Off` button does not delete a network. It only enables or disables the selected saved network. Disabled networks keep their password but are skipped during startup and reconnect attempts.
+
 Adding a network:
 
 1. Tap `Setup`.
@@ -249,6 +251,8 @@ Adding a network:
 5. Open `192.168.4.1`.
 6. Select the WiFi network or phone hotspot.
 7. Enter the password and save.
+
+You do not need to disconnect from the current WiFi before adding a new home WiFi or phone hotspot. The new network is added to the saved list, and existing networks remain saved unless you delete them or disable them with `On/Off`.
 
 Passwords are not shown on the ESP32 screen. They are stored in ESP32 Preferences/NVS and can be exported to SD card only if you choose `Export`.
 
