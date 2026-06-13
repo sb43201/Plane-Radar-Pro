@@ -212,38 +212,18 @@ void DisplayUI::button(int16_t x, int16_t y, int16_t w, int16_t h, const String 
 void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, uint16_t outlineColor,
                                  bool selected) {
   const float angle = (isnan(heading) ? 0 : heading) * PI / 180.0f;
-  const float s = sinf(angle);
-  const float c = cosf(angle);
-  auto tx = [&](float lx, float ly) -> int16_t { return x + lroundf(lx * c - ly * s); };
-  auto ty = [&](float lx, float ly) -> int16_t { return y + lroundf(lx * s + ly * c); };
-
-  auto drawLocalLine = [&](float ax, float ay, float bx, float by, uint16_t lineColor, int16_t offsetX = 0,
-                           int16_t offsetY = 0) {
-    tft_.drawLine(tx(ax, ay) + offsetX, ty(ax, ay) + offsetY, tx(bx, by) + offsetX, ty(bx, by) + offsetY,
-                  lineColor);
-  };
-
-  auto colorLine = [&](float ax, float ay, float bx, float by) {
-    const float dx = bx - ax;
-    const float dy = by - ay;
-    const float len = sqrtf(dx * dx + dy * dy);
-    const float ox = len > 0.1f ? -dy / len : 0.0f;
-    const float oy = len > 0.1f ? dx / len : 0.0f;
-    drawLocalLine(ax, ay, bx, by, color);
-    drawLocalLine(ax + ox, ay + oy, bx + ox, by + oy, color);
-  };
-
-  drawLocalLine(0, -9, 0, 8, outlineColor, 1, 1);
-  drawLocalLine(-8, -1, 8, -1, outlineColor, 1, 1);
-  drawLocalLine(-4, 6, 4, 6, outlineColor, 1, 1);
-
-  tft_.fillTriangle(tx(0, -11), ty(0, -11), tx(-3, -7), ty(-3, -7), tx(3, -7), ty(3, -7), color);
-  colorLine(0, -9, 0, 8);
-  colorLine(-8, -1, 8, -1);
-  colorLine(-4, 6, 4, 6);
+  const int16_t noseX = x + lroundf(sinf(angle) * 10);
+  const int16_t noseY = y - lroundf(cosf(angle) * 10);
+  const int16_t leftX = x + lroundf(sinf(angle + 2.45f) * 8);
+  const int16_t leftY = y - lroundf(cosf(angle + 2.45f) * 8);
+  const int16_t rightX = x + lroundf(sinf(angle - 2.45f) * 8);
+  const int16_t rightY = y - lroundf(cosf(angle - 2.45f) * 8);
+  tft_.drawCircle(x, y, 12, outlineColor);
+  tft_.fillTriangle(noseX, noseY, leftX, leftY, rightX, rightY, color);
+  tft_.drawTriangle(noseX, noseY, leftX, leftY, rightX, rightY, outlineColor);
   if (selected) {
-    tft_.drawCircle(x, y, 10, outlineColor);
-    tft_.drawCircle(x, y, 11, outlineColor);
+    tft_.drawCircle(x, y, 14, outlineColor);
+    tft_.drawCircle(x, y, 15, outlineColor);
   }
 }
 
