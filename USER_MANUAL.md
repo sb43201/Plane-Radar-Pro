@@ -368,7 +368,7 @@ Settings screen:
 | Reset / Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
 
-When GPS has a fix, Plane Radar Pro normally uses the GPS position as home. If you tap an airport and choose `Center Radar Here`, the radar stays centered on that airport. To return to your GPS location, open `Setup` and tap `Use GPS`.
+When GPS has a fix, Plane Radar Pro normally uses the GPS position as home. If you tap an airport and choose `Center Radar Here`, the radar temporarily centers on that airport for the radar, aircraft list, airport overlay, and ADS-B query. This does not overwrite the saved home latitude/longitude shown on the Setup page. To return to your GPS location, open `Setup` and tap `Use GPS`.
 
 ## Touchscreen Calibration
 

@@ -52,6 +52,8 @@ RawTouchPoint calibrationPoints[4];
 uint8_t calibrationStep = 0;
 bool calibrationWaitingForRelease = false;
 bool airportCenterActive = false;
+float airportCenterLat = NAN;
+float airportCenterLon = NAN;
 bool startupCalibrationMode = false;
 
 void updateAircraftAlerts();
@@ -59,6 +61,21 @@ void processGpsLogging();
 void updateAirports(bool force = false);
 void continueStartupAfterCalibration();
 void startTouchCalibration(bool startupMode);
+
+float activeRadarLat() {
+  return airportCenterActive && !isnan(airportCenterLat) ? airportCenterLat : settings.homeLat;
+}
+
+float activeRadarLon() {
+  return airportCenterActive && !isnan(airportCenterLon) ? airportCenterLon : settings.homeLon;
+}
+
+AppSettings activeRadarSettings() {
+  AppSettings active = settings;
+  active.homeLat = activeRadarLat();
+  active.homeLon = activeRadarLon();
+  return active;
+}
 
 String connectedWifiLabel() {
   String ssid = WiFi.SSID();
@@ -276,6 +293,8 @@ void applyPortalHomeLocation(const char *latText, const char *lonText) {
   }
 
   airportCenterActive = false;
+  airportCenterLat = NAN;
+  airportCenterLon = NAN;
   settings.homeLat = lat;
   settings.homeLon = lon;
   settingsStore.save(settings);
@@ -370,7 +389,7 @@ void refreshAdsbIfDue(bool force = false) {
     return;
   }
 
-  const bool ok = adsb.fetch(settings.homeLat, settings.homeLon, settings.rangeKm, aircraft);
+  const bool ok = adsb.fetch(activeRadarLat(), activeRadarLon(), settings.rangeKm, aircraft);
   if (ok) {
     lastUpdateText = aircraft.empty() ? "No aircraft" : "Updated " + localTimeText();
     updateAircraftAlerts();
@@ -388,7 +407,7 @@ void updateAircraftAlerts() {
 
   for (const Aircraft &a : aircraft) {
     if (!isnan(a.lat) && !isnan(a.lon)) {
-      const float distance = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
+      const float distance = Radar::distanceKm(activeRadarLat(), activeRadarLon(), a.lat, a.lon);
       if (distance <= Config::ALERT_DISTANCE_KM && distance < nearestDistance) {
         nearestDistance = distance;
         nearestAlert = aircraftName(a) + " " + String(distance, 1) + " km";
@@ -452,7 +471,7 @@ void updateGpsPosition() {
 }
 
 void updateAirports(bool force) {
-  if (airportManager.refreshIfDue(settings.homeLat, settings.homeLon, force)) {
+  if (airportManager.refreshIfDue(activeRadarLat(), activeRadarLon(), force)) {
     invalidateForBackgroundUpdate();
   }
 }
@@ -537,15 +556,15 @@ void handleUiEvent(const UIEvent &event) {
       const Airport *airport = selectedAirport();
       if (airport) {
         const String airportCode = AirportManager::displayCode(*airport);
-        settings.homeLat = airport->lat;
-        settings.homeLon = airport->lon;
+        airportCenterLat = airport->lat;
+        airportCenterLon = airport->lon;
         lastAdsbMs = 0;
+        airportCenterActive = true;
         updateAirports(true);
         refreshAdsbIfDue(true);
-        airportCenterActive = true;
         currentScreen = ScreenId::Radar;
-        Serial.printf("[airport] radar centered on %s %.6f, %.6f\n", airportCode.c_str(), settings.homeLat,
-                      settings.homeLon);
+        Serial.printf("[airport] radar temporarily centered on %s %.6f, %.6f\n", airportCode.c_str(),
+                      airportCenterLat, airportCenterLon);
       }
       break;
     }
@@ -605,6 +624,8 @@ void handleUiEvent(const UIEvent &event) {
     case UIAction::UseGpsHome:
       if (gps.hasFix()) {
         airportCenterActive = false;
+        airportCenterLat = NAN;
+        airportCenterLon = NAN;
         settings.homeLat = gps.latitude();
         settings.homeLon = gps.longitude();
         settingsStore.save(settings);
@@ -620,19 +641,27 @@ void handleUiEvent(const UIEvent &event) {
       break;
     case UIAction::LatPlus:
       airportCenterActive = false;
+      airportCenterLat = NAN;
+      airportCenterLon = NAN;
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LatMinus:
       airportCenterActive = false;
+      airportCenterLat = NAN;
+      airportCenterLon = NAN;
       settings.homeLat = constrain(settings.homeLat - 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LonPlus:
       airportCenterActive = false;
+      airportCenterLat = NAN;
+      airportCenterLon = NAN;
       settings.homeLon += 0.01f;
       if (settings.homeLon > 180.0f) settings.homeLon = -180.0f;
       break;
     case UIAction::LonMinus:
       airportCenterActive = false;
+      airportCenterLat = NAN;
+      airportCenterLon = NAN;
       settings.homeLon -= 0.01f;
       if (settings.homeLon < -180.0f) settings.homeLon = 180.0f;
       break;
@@ -779,22 +808,23 @@ void processResetWiFiHold(const UIEvent &event) {
 
 void drawCurrentScreen(bool force = false) {
   const String timeText = localTimeText();
+  AppSettings radarSettings = activeRadarSettings();
   switch (currentScreen) {
     case ScreenId::Radar:
-      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, gpsCompassStatus, batteryStatus, timeText, lastUpdateText,
-                        alertStatus, airportManager.airports(), airportManager.statusText(), force);
+      display.drawRadar(radarSettings, aircraft, wifiStatus, gpsStatus, gpsCompassStatus, batteryStatus, timeText,
+                        lastUpdateText, alertStatus, airportManager.airports(), airportManager.statusText(), force);
       break;
     case ScreenId::AircraftList:
-      display.drawAircraftList(settings, aircraft, lastUpdateText, force);
+      display.drawAircraftList(radarSettings, aircraft, lastUpdateText, force);
       break;
     case ScreenId::AirportList:
       display.drawAirportList(settings, airportManager.airports(), force);
       break;
     case ScreenId::Detail:
-      display.drawAircraftDetail(settings, selectedAircraft(), force);
+      display.drawAircraftDetail(radarSettings, selectedAircraft(), force);
       break;
     case ScreenId::AirportDetail:
-      display.drawAirportDetail(settings, selectedAirport(), aircraft, force);
+      display.drawAirportDetail(radarSettings, selectedAirport(), aircraft, force);
       break;
     case ScreenId::Settings:
       display.drawSettings(settings, wifiStatus, force);
@@ -868,7 +898,8 @@ void loop() {
   refreshAdsbIfDue();
 
   TouchPoint point = touch.read(settings);
-  UIEvent event = display.handleTouch(point, currentScreen, settings, aircraft, airportManager.airports(), wifiExt);
+  AppSettings touchSettings = activeRadarSettings();
+  UIEvent event = display.handleTouch(point, currentScreen, touchSettings, aircraft, airportManager.airports(), wifiExt);
   processResetWiFiHold(event);
   handleUiEvent(event);
   if (event.action != UIAction::None) {
