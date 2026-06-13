@@ -960,7 +960,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
   }
 
   const int16_t navY = tft_.height() - 38;
-  if (point.y >= navY) {
+  if (point.y >= navY - 22) {
     const int16_t w = tft_.width();
     if (point.x < w * 22 / 100) event.action = UIAction::ShowRadar;
     else if (point.x < w * 42 / 100) event.action = UIAction::ShowList;
