@@ -217,38 +217,28 @@ void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t c
   auto tx = [&](float lx, float ly) -> int16_t { return x + lroundf(lx * c - ly * s); };
   auto ty = [&](float lx, float ly) -> int16_t { return y + lroundf(lx * s + ly * c); };
 
-  const int16_t noseX = tx(0, -13);
-  const int16_t noseY = ty(0, -13);
-  const int16_t bodyRX = tx(3, 7);
-  const int16_t bodyRY = ty(3, 7);
-  const int16_t bodyLX = tx(-3, 7);
-  const int16_t bodyLY = ty(-3, 7);
-  const int16_t wingRX = tx(13, 2);
-  const int16_t wingRY = ty(13, 2);
-  const int16_t wingLX = tx(-13, 2);
-  const int16_t wingLY = ty(-13, 2);
-  const int16_t tailRX = tx(8, 11);
-  const int16_t tailRY = ty(8, 11);
-  const int16_t tailLX = tx(-8, 11);
-  const int16_t tailLY = ty(-8, 11);
-  const int16_t tailCX = tx(0, 7);
-  const int16_t tailCY = ty(0, 7);
+  auto thickLine = [&](float ax, float ay, float bx, float by, uint16_t lineColor) {
+    const float dx = bx - ax;
+    const float dy = by - ay;
+    const float len = sqrtf(dx * dx + dy * dy);
+    const float ox = len > 0.1f ? -dy / len : 0.0f;
+    const float oy = len > 0.1f ? dx / len : 0.0f;
+    tft_.drawLine(tx(ax, ay), ty(ax, ay), tx(bx, by), ty(bx, by), lineColor);
+    tft_.drawLine(tx(ax + ox, ay + oy), ty(ax + ox, ay + oy), tx(bx + ox, by + oy), ty(bx + ox, by + oy),
+                  lineColor);
+    tft_.drawLine(tx(ax - ox, ay - oy), ty(ax - ox, ay - oy), tx(bx - ox, by - oy), ty(bx - ox, by - oy),
+                  lineColor);
+  };
 
-  tft_.drawCircle(x, y, 12, outlineColor);
-  tft_.fillTriangle(noseX, noseY, bodyRX, bodyRY, bodyLX, bodyLY, color);
-  tft_.fillTriangle(tx(0, -2), ty(0, -2), wingRX, wingRY, wingLX, wingLY, color);
-  tft_.fillTriangle(tailCX, tailCY, tailRX, tailRY, tailLX, tailLY, color);
-
-  tft_.drawLine(noseX, noseY, wingRX, wingRY, outlineColor);
-  tft_.drawLine(wingRX, wingRY, bodyRX, bodyRY, outlineColor);
-  tft_.drawLine(bodyRX, bodyRY, tailRX, tailRY, outlineColor);
-  tft_.drawLine(tailRX, tailRY, tailCX, tailCY, outlineColor);
-  tft_.drawLine(tailCX, tailCY, tailLX, tailLY, outlineColor);
-  tft_.drawLine(tailLX, tailLY, bodyLX, bodyLY, outlineColor);
-  tft_.drawLine(bodyLX, bodyLY, wingLX, wingLY, outlineColor);
-  tft_.drawLine(wingLX, wingLY, noseX, noseY, outlineColor);
+  tft_.drawCircle(x, y, selected ? 13 : 9, outlineColor);
+  thickLine(0, -13, 0, 11, outlineColor);
+  thickLine(-12, -1, 12, -1, outlineColor);
+  thickLine(-6, 8, 6, 8, outlineColor);
+  tft_.fillTriangle(tx(0, -15), ty(0, -15), tx(-3, -9), ty(-3, -9), tx(3, -9), ty(3, -9), color);
+  tft_.drawLine(tx(0, -13), ty(0, -13), tx(0, 11), ty(0, 11), color);
+  tft_.drawLine(tx(-10, -1), ty(-10, -1), tx(10, -1), ty(10, -1), color);
+  tft_.drawLine(tx(-5, 8), ty(-5, 8), tx(5, 8), ty(5, 8), color);
   if (selected) {
-    tft_.drawCircle(x, y, 14, outlineColor);
     tft_.drawCircle(x, y, 15, outlineColor);
   }
 }
