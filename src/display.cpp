@@ -217,29 +217,33 @@ void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t c
   auto tx = [&](float lx, float ly) -> int16_t { return x + lroundf(lx * c - ly * s); };
   auto ty = [&](float lx, float ly) -> int16_t { return y + lroundf(lx * s + ly * c); };
 
-  auto thickLine = [&](float ax, float ay, float bx, float by, uint16_t lineColor) {
+  auto drawLocalLine = [&](float ax, float ay, float bx, float by, uint16_t lineColor, int16_t offsetX = 0,
+                           int16_t offsetY = 0) {
+    tft_.drawLine(tx(ax, ay) + offsetX, ty(ax, ay) + offsetY, tx(bx, by) + offsetX, ty(bx, by) + offsetY,
+                  lineColor);
+  };
+
+  auto colorLine = [&](float ax, float ay, float bx, float by) {
     const float dx = bx - ax;
     const float dy = by - ay;
     const float len = sqrtf(dx * dx + dy * dy);
     const float ox = len > 0.1f ? -dy / len : 0.0f;
     const float oy = len > 0.1f ? dx / len : 0.0f;
-    tft_.drawLine(tx(ax, ay), ty(ax, ay), tx(bx, by), ty(bx, by), lineColor);
-    tft_.drawLine(tx(ax + ox, ay + oy), ty(ax + ox, ay + oy), tx(bx + ox, by + oy), ty(bx + ox, by + oy),
-                  lineColor);
-    tft_.drawLine(tx(ax - ox, ay - oy), ty(ax - ox, ay - oy), tx(bx - ox, by - oy), ty(bx - ox, by - oy),
-                  lineColor);
+    drawLocalLine(ax, ay, bx, by, color);
+    drawLocalLine(ax + ox, ay + oy, bx + ox, by + oy, color);
   };
 
-  tft_.drawCircle(x, y, selected ? 13 : 9, outlineColor);
-  thickLine(0, -13, 0, 11, outlineColor);
-  thickLine(-12, -1, 12, -1, outlineColor);
-  thickLine(-6, 8, 6, 8, outlineColor);
-  tft_.fillTriangle(tx(0, -15), ty(0, -15), tx(-3, -9), ty(-3, -9), tx(3, -9), ty(3, -9), color);
-  tft_.drawLine(tx(0, -13), ty(0, -13), tx(0, 11), ty(0, 11), color);
-  tft_.drawLine(tx(-10, -1), ty(-10, -1), tx(10, -1), ty(10, -1), color);
-  tft_.drawLine(tx(-5, 8), ty(-5, 8), tx(5, 8), ty(5, 8), color);
+  drawLocalLine(0, -11, 0, 9, outlineColor, 1, 1);
+  drawLocalLine(-10, -1, 10, -1, outlineColor, 1, 1);
+  drawLocalLine(-5, 7, 5, 7, outlineColor, 1, 1);
+
+  tft_.fillTriangle(tx(0, -13), ty(0, -13), tx(-3, -8), ty(-3, -8), tx(3, -8), ty(3, -8), color);
+  colorLine(0, -11, 0, 9);
+  colorLine(-10, -1, 10, -1);
+  colorLine(-5, 7, 5, 7);
   if (selected) {
-    tft_.drawCircle(x, y, 15, outlineColor);
+    tft_.drawCircle(x, y, 12, outlineColor);
+    tft_.drawCircle(x, y, 13, outlineColor);
   }
 }
 
