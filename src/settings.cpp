@@ -8,6 +8,10 @@ AppSettings SettingsStore::load() {
   AppSettings s;
   s.homeLat = prefs_.getFloat("homeLat", Config::DEFAULT_HOME_LAT);
   s.homeLon = prefs_.getFloat("homeLon", Config::DEFAULT_HOME_LON);
+  s.centerMode = prefs_.getUChar("ctrMode", CENTER_MANUAL);
+  s.airportCenterLat = prefs_.getFloat("aptCtrLat", NAN);
+  s.airportCenterLon = prefs_.getFloat("aptCtrLon", NAN);
+  s.airportCenterCode = prefs_.getString("aptCtrCode", "");
   s.rangeKm = prefs_.getUShort("rangeKm", Config::DEFAULT_RANGE_KM);
   s.nightMode = prefs_.getBool("night", false);
   s.displayRotation = prefs_.getUChar("rotationP", Config::DEFAULT_ROTATION);
@@ -46,6 +50,12 @@ AppSettings SettingsStore::load() {
     }
   }
   if (!refreshOk) s.adsbRefreshSec = 5;
+  if (s.centerMode > CENTER_AIRPORT) s.centerMode = CENTER_MANUAL;
+  if (s.centerMode == CENTER_AIRPORT &&
+      (isnan(s.airportCenterLat) || isnan(s.airportCenterLon) || s.airportCenterLat < -90.0f ||
+       s.airportCenterLat > 90.0f || s.airportCenterLon < -180.0f || s.airportCenterLon > 180.0f)) {
+    s.centerMode = CENTER_MANUAL;
+  }
   if (s.displayRotation > 3) s.displayRotation = Config::DEFAULT_ROTATION;
   return s;
 }
@@ -53,6 +63,10 @@ AppSettings SettingsStore::load() {
 void SettingsStore::save(const AppSettings &s) {
   prefs_.putFloat("homeLat", s.homeLat);
   prefs_.putFloat("homeLon", s.homeLon);
+  prefs_.putUChar("ctrMode", s.centerMode);
+  prefs_.putFloat("aptCtrLat", s.airportCenterLat);
+  prefs_.putFloat("aptCtrLon", s.airportCenterLon);
+  prefs_.putString("aptCtrCode", s.airportCenterCode);
   prefs_.putUShort("rangeKm", s.rangeKm);
   prefs_.putBool("night", s.nightMode);
   prefs_.putUChar("rotationP", s.displayRotation);

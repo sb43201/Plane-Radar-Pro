@@ -51,9 +51,8 @@ String alertStatus = "";
 RawTouchPoint calibrationPoints[4];
 uint8_t calibrationStep = 0;
 bool calibrationWaitingForRelease = false;
-bool airportCenterActive = false;
-float airportCenterLat = NAN;
-float airportCenterLon = NAN;
+float lastGpsCenterLat = NAN;
+float lastGpsCenterLon = NAN;
 bool startupCalibrationMode = false;
 
 void updateAircraftAlerts();
@@ -63,11 +62,15 @@ void continueStartupAfterCalibration();
 void startTouchCalibration(bool startupMode);
 
 float activeRadarLat() {
-  return airportCenterActive && !isnan(airportCenterLat) ? airportCenterLat : settings.homeLat;
+  if (settings.centerMode == CENTER_GPS && gps.hasFix()) return gps.latitude();
+  if (settings.centerMode == CENTER_AIRPORT && !isnan(settings.airportCenterLat)) return settings.airportCenterLat;
+  return settings.homeLat;
 }
 
 float activeRadarLon() {
-  return airportCenterActive && !isnan(airportCenterLon) ? airportCenterLon : settings.homeLon;
+  if (settings.centerMode == CENTER_GPS && gps.hasFix()) return gps.longitude();
+  if (settings.centerMode == CENTER_AIRPORT && !isnan(settings.airportCenterLon)) return settings.airportCenterLon;
+  return settings.homeLon;
 }
 
 AppSettings activeRadarSettings() {
@@ -261,10 +264,6 @@ void processGpsLogging() {
   appendGpsLogLine();
 }
 
-void formatPortalCoordinate(char *buffer, size_t len, float value) {
-  snprintf(buffer, len, "%.6f", value);
-}
-
 bool parsePortalFloat(const char *text, float &value) {
   if (!text) return false;
   while (isspace((unsigned char)*text)) text++;
@@ -280,7 +279,34 @@ bool parsePortalFloat(const char *text, float &value) {
   return true;
 }
 
-void applyPortalHomeLocation(const char *latText, const char *lonText) {
+String centerModeText() {
+  if (settings.centerMode == CENTER_GPS) return "GPS";
+  if (settings.centerMode == CENTER_AIRPORT) {
+    return settings.airportCenterCode.length() ? "APT " + settings.airportCenterCode : "APT";
+  }
+  return "Manual";
+}
+
+void applyPortalCenterSettings(const char *airportText, const char *latText, const char *lonText) {
+  String airportCode = airportText ? String(airportText) : String("");
+  airportCode.trim();
+  if (airportCode.length()) {
+    Airport airport;
+    if (airportManager.findInDatabaseByCode(airportCode, airport)) {
+      settings.centerMode = CENTER_AIRPORT;
+      settings.airportCenterLat = airport.lat;
+      settings.airportCenterLon = airport.lon;
+      settings.airportCenterCode = AirportManager::displayCode(airport);
+      settingsStore.save(settings);
+      lastAdsbMs = 0;
+      updateAirports(true);
+      Serial.printf("[wifi] portal center airport saved %s lat=%.6f lon=%.6f\n",
+                    settings.airportCenterCode.c_str(), settings.airportCenterLat, settings.airportCenterLon);
+      return;
+    }
+    Serial.printf("[wifi] portal center airport not found: %s\n", airportCode.c_str());
+  }
+
   float lat = NAN;
   float lon = NAN;
   if (!parsePortalFloat(latText, lat) || !parsePortalFloat(lonText, lon)) {
@@ -292,9 +318,7 @@ void applyPortalHomeLocation(const char *latText, const char *lonText) {
     return;
   }
 
-  airportCenterActive = false;
-  airportCenterLat = NAN;
-  airportCenterLon = NAN;
+  settings.centerMode = CENTER_MANUAL;
   settings.homeLat = lat;
   settings.homeLon = lon;
   settingsStore.save(settings);
@@ -311,12 +335,14 @@ void startWiFi() {
   wm.setConnectRetries(2);
   wm.setBreakAfterConfig(true);
   wm.setSaveConfigCallback(markWifiPortalSaved);
-  char portalLat[18];
-  char portalLon[18];
-  formatPortalCoordinate(portalLat, sizeof(portalLat), settings.homeLat);
-  formatPortalCoordinate(portalLon, sizeof(portalLon), settings.homeLon);
+  char portalAirport[12] = "";
+  char portalLat[18] = "";
+  char portalLon[18] = "";
+  WiFiManagerParameter centerAirportParam("center_airport", "Center airport code", portalAirport,
+                                          sizeof(portalAirport) - 1);
   WiFiManagerParameter homeLatParam("home_lat", "Home latitude", portalLat, sizeof(portalLat) - 1);
   WiFiManagerParameter homeLonParam("home_lon", "Home longitude", portalLon, sizeof(portalLon) - 1);
+  wm.addParameter(&centerAirportParam);
   wm.addParameter(&homeLatParam);
   wm.addParameter(&homeLonParam);
 
@@ -345,7 +371,7 @@ void startWiFi() {
   if (ok || wifiPortalSaved) {
     const String portalSsid = wm.getWiFiSSID(true);
     if (portalSsid.length()) wifiExt.addOrUpdate(portalSsid, wm.getWiFiPass(true), true);
-    applyPortalHomeLocation(homeLatParam.getValue(), homeLonParam.getValue());
+    applyPortalCenterSettings(centerAirportParam.getValue(), homeLatParam.getValue(), homeLonParam.getValue());
   }
   if (wifiPortalSaved) {
     Serial.println("[wifi] portal saved credentials; rebooting into radar mode");
@@ -454,19 +480,18 @@ void updateGpsPosition() {
     if (gpsCompassStatus.length()) Serial.printf("[gps] compass=%s\n", gpsCompassStatus.c_str());
   }
 
-  if (!gps.hasFix() || airportCenterActive) return;
-
-  const float lat = gps.latitude();
-  const float lon = gps.longitude();
-  if (isnan(lat) || isnan(lon)) return;
-
-  if (fabs(settings.homeLat - lat) > 0.00005f || fabs(settings.homeLon - lon) > 0.00005f) {
-    settings.homeLat = lat;
-    settings.homeLon = lon;
+  if (settings.centerMode == CENTER_GPS && gps.hasFix()) {
+    const float lat = gps.latitude();
+    const float lon = gps.longitude();
+    const bool moved = isnan(lastGpsCenterLat) || isnan(lastGpsCenterLon) ||
+                       Radar::distanceKm(lastGpsCenterLat, lastGpsCenterLon, lat, lon) >=
+                           Config::AIRPORT_RELOAD_MOVE_KM;
+    if (!moved) return;
+    lastGpsCenterLat = lat;
+    lastGpsCenterLon = lon;
     lastAdsbMs = 0;
     updateAirports(true);
-    invalidateForBackgroundUpdate();
-    Serial.printf("[gps] using GPS home position %.6f, %.6f\n", settings.homeLat, settings.homeLon);
+    Serial.printf("[gps] radar centered from live GPS %.6f, %.6f\n", lat, lon);
   }
 }
 
@@ -499,12 +524,14 @@ void startAddNetworkPortal() {
   wm.setConnectRetries(2);
   wm.setBreakAfterConfig(true);
   wm.setSaveConfigCallback(markWifiPortalSaved);
-  char portalLat[18];
-  char portalLon[18];
-  formatPortalCoordinate(portalLat, sizeof(portalLat), settings.homeLat);
-  formatPortalCoordinate(portalLon, sizeof(portalLon), settings.homeLon);
+  char portalAirport[12] = "";
+  char portalLat[18] = "";
+  char portalLon[18] = "";
+  WiFiManagerParameter centerAirportParam("center_airport", "Center airport code", portalAirport,
+                                          sizeof(portalAirport) - 1);
   WiFiManagerParameter homeLatParam("home_lat", "Home latitude", portalLat, sizeof(portalLat) - 1);
   WiFiManagerParameter homeLonParam("home_lon", "Home longitude", portalLon, sizeof(portalLon) - 1);
+  wm.addParameter(&centerAirportParam);
   wm.addParameter(&homeLatParam);
   wm.addParameter(&homeLonParam);
   Serial.println("[wifi] starting add-network portal");
@@ -513,7 +540,7 @@ void startAddNetworkPortal() {
   if (ok || wifiPortalSaved) {
     const String portalSsid = wm.getWiFiSSID(true);
     if (portalSsid.length()) wifiExt.addOrUpdate(portalSsid, wm.getWiFiPass(true), true);
-    applyPortalHomeLocation(homeLatParam.getValue(), homeLonParam.getValue());
+    applyPortalCenterSettings(centerAirportParam.getValue(), homeLatParam.getValue(), homeLonParam.getValue());
     wifiStatus = WiFi.status() == WL_CONNECTED ? connectedWifiLabel() : "Searching";
     Serial.printf("[wifi] added portal network ssid=%s\n", wm.getWiFiSSID(true).c_str());
   } else {
@@ -556,15 +583,17 @@ void handleUiEvent(const UIEvent &event) {
       const Airport *airport = selectedAirport();
       if (airport) {
         const String airportCode = AirportManager::displayCode(*airport);
-        airportCenterLat = airport->lat;
-        airportCenterLon = airport->lon;
+        settings.centerMode = CENTER_AIRPORT;
+        settings.airportCenterLat = airport->lat;
+        settings.airportCenterLon = airport->lon;
+        settings.airportCenterCode = airportCode;
+        settingsStore.save(settings);
         lastAdsbMs = 0;
-        airportCenterActive = true;
         updateAirports(true);
         refreshAdsbIfDue(true);
         currentScreen = ScreenId::Radar;
-        Serial.printf("[airport] radar temporarily centered on %s %.6f, %.6f\n", airportCode.c_str(),
-                      airportCenterLat, airportCenterLon);
+        Serial.printf("[airport] radar center mode set to %s %.6f, %.6f\n", airportCode.c_str(),
+                      settings.airportCenterLat, settings.airportCenterLon);
       }
       break;
     }
@@ -621,47 +650,41 @@ void handleUiEvent(const UIEvent &event) {
       Serial.printf("[settings] adsbRefreshSec=%u\n", settings.adsbRefreshSec);
       break;
     }
-    case UIAction::UseGpsHome:
-      if (gps.hasFix()) {
-        airportCenterActive = false;
-        airportCenterLat = NAN;
-        airportCenterLon = NAN;
-        settings.homeLat = gps.latitude();
-        settings.homeLon = gps.longitude();
-        settingsStore.save(settings);
-        lastAdsbMs = 0;
-        updateAirports(true);
-        refreshAdsbIfDue(true);
-        currentScreen = ScreenId::Radar;
-        Serial.printf("[gps] home set from GPS %.6f, %.6f\n", settings.homeLat, settings.homeLon);
+    case UIAction::CenterModeNext:
+      if (settings.centerMode == CENTER_MANUAL) {
+        settings.centerMode = CENTER_GPS;
+      } else if (settings.centerMode == CENTER_GPS) {
+        settings.centerMode = CENTER_AIRPORT;
       } else {
-        lastUpdateText = "No GPS fix";
-        Serial.println("[gps] Use GPS requested but no fix is available");
+        settings.centerMode = CENTER_MANUAL;
       }
+      if (settings.centerMode == CENTER_AIRPORT &&
+          (isnan(settings.airportCenterLat) || isnan(settings.airportCenterLon))) {
+        settings.centerMode = CENTER_MANUAL;
+        lastUpdateText = "No airport center";
+      }
+      if (settings.centerMode == CENTER_GPS && !gps.hasFix()) lastUpdateText = "No GPS fix";
+      settingsStore.save(settings);
+      lastAdsbMs = 0;
+      updateAirports(true);
+      refreshAdsbIfDue(true);
+      Serial.printf("[settings] centerMode=%s\n", centerModeText().c_str());
       break;
     case UIAction::LatPlus:
-      airportCenterActive = false;
-      airportCenterLat = NAN;
-      airportCenterLon = NAN;
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LatMinus:
-      airportCenterActive = false;
-      airportCenterLat = NAN;
-      airportCenterLon = NAN;
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLat = constrain(settings.homeLat - 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LonPlus:
-      airportCenterActive = false;
-      airportCenterLat = NAN;
-      airportCenterLon = NAN;
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLon += 0.01f;
       if (settings.homeLon > 180.0f) settings.homeLon = -180.0f;
       break;
     case UIAction::LonMinus:
-      airportCenterActive = false;
-      airportCenterLat = NAN;
-      airportCenterLon = NAN;
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLon -= 0.01f;
       if (settings.homeLon < -180.0f) settings.homeLon = 180.0f;
       break;
@@ -870,7 +893,7 @@ void setup() {
 
   display.begin(settings);
   airportManager.begin();
-  airportManager.loadNearby(settings.homeLat, settings.homeLon);
+  airportManager.loadNearby(activeRadarLat(), activeRadarLon());
   touch.begin(settings);
   gps.begin();
   updateBatteryStatus(true);

@@ -76,8 +76,8 @@ const char *uiActionName(UIAction action) {
       return "AirportLabelNext";
     case UIAction::RefreshRateNext:
       return "RefreshRateNext";
-    case UIAction::UseGpsHome:
-      return "UseGpsHome";
+    case UIAction::CenterModeNext:
+      return "CenterModeNext";
     case UIAction::LatPlus:
       return "LatPlus";
     case UIAction::LatMinus:
@@ -714,6 +714,12 @@ void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStat
   const uint16_t settingsPanel = settings.nightMode ? 0x2945 : panel(settings);
   const uint16_t settingsText = settings.nightMode ? TFT_WHITE : fg(settings);
   const uint16_t settingsAccent = accent(settings);
+  String centerLabel = "Manual";
+  if (settings.centerMode == CENTER_GPS) centerLabel = "GPS";
+  else if (settings.centerMode == CENTER_AIRPORT) {
+    centerLabel = settings.airportCenterCode.length() ? "APT " + settings.airportCenterCode : "APT";
+    if (centerLabel.length() > 8) centerLabel = centerLabel.substring(0, 8);
+  }
   auto settingsTextMode = [&]() {
     tft_.setTextColor(settingsText, settingsBg);
     tft_.setTextFont(2);
@@ -758,8 +764,8 @@ void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStat
   button(206, 242, 100, 28, String(settings.airportLabelKm) + "km", settingsAccent, TFT_WHITE);
 
   settingsTextMode();
-  tft_.drawString("Refresh", 16, 288);
-  button(110, 282, 86, 28, "Use GPS", settingsPanel, settingsText);
+  tft_.drawString("Center", 16, 288);
+  button(110, 282, 86, 28, centerLabel, settingsPanel, settingsText);
   button(206, 282, 100, 28, String(settings.adsbRefreshSec) + " sec", settingsAccent, TFT_WHITE);
 
   button(10, 334, 72, 30, "Reset", TFT_RED, TFT_WHITE);
@@ -1020,7 +1026,7 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inRect(point.x, point.y, 206, 202, 100, 28)) event.action = UIAction::StartTouchCalibration;
     else if (inRect(point.x, point.y, 110, 242, 86, 28)) event.action = UIAction::ToggleAirportOverlay;
     else if (inRect(point.x, point.y, 206, 242, 100, 28)) event.action = UIAction::AirportLabelNext;
-    else if (inRect(point.x, point.y, 110, 282, 86, 28)) event.action = UIAction::UseGpsHome;
+    else if (inRect(point.x, point.y, 110, 282, 86, 28)) event.action = UIAction::CenterModeNext;
     else if (inRect(point.x, point.y, 206, 282, 100, 28)) event.action = UIAction::RefreshRateNext;
     else if (inRect(point.x, point.y, 10, 334, 72, 30)) event.action = UIAction::ResetWiFiHold;
     else if (inRect(point.x, point.y, 88, 334, 68, 30)) event.action = UIAction::ShowWiFiSettings;

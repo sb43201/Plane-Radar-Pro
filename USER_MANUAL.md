@@ -174,11 +174,12 @@ Setup flow:
 4. Open `192.168.4.1` in your phone browser.
 5. Select your phone hotspot SSID.
 6. Enter the hotspot password.
-7. Optional: enter manual home latitude and longitude.
-8. Save.
+7. Optional: enter a center airport code such as `IND` or `KIND`.
+8. Optional: enter manual home latitude and longitude.
+9. Save.
 
-The captive portal home latitude/longitude fields are optional. If GPS has a fix, you can also use `Setup > Use GPS` later.
-9. The ESP32 saves credentials and restarts into radar mode.
+The captive portal center airport and home latitude/longitude fields are optional. If an airport code is entered, Plane Radar Pro uses that airport as the radar center without overwriting the manual home latitude/longitude. If latitude/longitude are entered instead, Plane Radar Pro switches to Manual center mode. If GPS has a fix, you can select GPS center mode later from `Setup`.
+10. The ESP32 saves credentials and restarts into radar mode.
 
 Future boots try saved networks by priority, using up to 30 seconds per attempt, before opening setup mode.
 
@@ -255,8 +256,9 @@ Adding a network:
 5. Open `192.168.4.1`.
 6. Select the WiFi network or phone hotspot.
 7. Enter the password.
-8. Optional: update the manual home latitude and longitude.
-9. Save.
+8. Optional: enter a center airport code.
+9. Optional: update the manual home latitude and longitude.
+10. Save.
 
 You do not need to disconnect from the current WiFi before adding a new home WiFi or phone hotspot. The new network is added to the saved list, and existing networks remain saved unless you delete them or disable them with `On/Off`.
 
@@ -363,12 +365,20 @@ Settings screen:
 | Airport Label Distance | Cycle 10, 25, 50, 100, 150 km |
 | Cal Touch | Start four-point touchscreen calibration |
 | Log On / Log Off | Toggle GPS location logging |
-| Use GPS | Set home/radar center to the current GPS fix |
+| Center | Cycle radar center source: Manual, GPS, or APT |
 | WiFi | Open multi-network WiFi Settings |
 | Reset / Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
 
-When GPS has a fix, Plane Radar Pro normally uses the GPS position as home. If you tap an airport and choose `Center Radar Here`, the radar temporarily centers on that airport for the radar, aircraft list, airport overlay, and ADS-B query. This does not overwrite the saved home latitude/longitude shown on the Setup page. To return to your GPS location, open `Setup` and tap `Use GPS`.
+Radar center modes:
+
+| Mode | Meaning |
+| --- | --- |
+| Manual | Use the entered/saved latitude and longitude |
+| GPS | Use the current live GPS fix when available |
+| APT | Use the selected airport or airport code |
+
+Tapping an airport and choosing `Center Radar Here` switches to APT center mode. This does not overwrite the saved manual latitude/longitude shown on the Setup page. To switch back, open `Setup` and tap `Center` until the desired mode is shown.
 
 ## Touchscreen Calibration
 

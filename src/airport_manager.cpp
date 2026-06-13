@@ -137,6 +137,43 @@ const Airport *AirportManager::findByCode(const String &code) const {
   return nullptr;
 }
 
+bool AirportManager::findInDatabaseByCode(const String &code, Airport &airport) const {
+  String target = code;
+  target.trim();
+  target.toUpperCase();
+  if (!sdReady_ || target.isEmpty()) return false;
+
+  File file = SD.open(Config::AIRPORT_CSV_PATH, FILE_READ);
+  if (!file) return false;
+
+  bool firstLine = true;
+  char line[512];
+  while (file.available()) {
+    const size_t len = file.readBytesUntil('\n', line, sizeof(line) - 1);
+    line[len] = '\0';
+    if (len == sizeof(line) - 1) {
+      while (file.available() && file.read() != '\n') yield();
+      continue;
+    }
+    if (blankLine(line)) continue;
+    if (firstLine) {
+      firstLine = false;
+      if (strncmp(line, "ident,", 6) == 0) continue;
+    }
+
+    Airport candidate;
+    if (!parseCsvLine(line, candidate)) continue;
+    if (candidate.ident.equalsIgnoreCase(target) || candidate.gpsCode.equalsIgnoreCase(target) ||
+        candidate.iataCode.equalsIgnoreCase(target) || candidate.localCode.equalsIgnoreCase(target)) {
+      airport = candidate;
+      file.close();
+      return true;
+    }
+  }
+  file.close();
+  return false;
+}
+
 String AirportManager::statusText() const {
   if (warning_.length()) return warning_;
   return String(airports_.size()) + " airports";
