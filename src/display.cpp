@@ -961,12 +961,23 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
 
   const int16_t navY = tft_.height() - 38;
   if (point.y >= navY - 22) {
-    const int16_t w = tft_.width();
-    if (point.x < w * 22 / 100) event.action = UIAction::ShowRadar;
-    else if (point.x < w * 42 / 100) event.action = UIAction::ShowList;
-    else if (point.x < w * 62 / 100) event.action = UIAction::ShowAirportList;
-    else if (point.x < w * 85 / 100) event.action = UIAction::RangeNext;
-    else event.action = UIAction::ShowSettings;
+    const int16_t gap = 4;
+    const int16_t buttonW = (tft_.width() - gap * 6) / 5;
+    const int16_t radarEnd = gap + buttonW + gap / 2;
+    const int16_t acEnd = gap * 2 + buttonW * 2 + gap / 2;
+    const int16_t aptEnd = gap * 3 + buttonW * 3 + gap / 2;
+    const int16_t rangeEnd = gap * 4 + buttonW * 4 + gap / 2;
+    if (point.x < radarEnd) {
+      event.action = UIAction::ShowRadar;
+    } else if (point.x < acEnd) {
+      event.action = UIAction::ShowList;
+    } else if (point.x < aptEnd) {
+      event.action = UIAction::ShowAirportList;
+    } else if (point.x < rangeEnd) {
+      event.action = UIAction::RangeNext;
+    } else {
+      event.action = UIAction::ShowSettings;
+    }
   }
 
   if (event.action != UIAction::None) {
@@ -1015,30 +1026,30 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     if (row >= 0) {
       event.wifiIndex = row;
       event.action = UIAction::SelectWifiNetwork;
-    } else if (inTouchRect(point.x, point.y, 10, 282, 70, 28)) {
+    } else if (inTouchRect(point.x, point.y, 10, 282, 70, 28, 5)) {
       event.action = UIAction::WifiAddPortal;
-    } else if (inTouchRect(point.x, point.y, 86, 282, 70, 28)) {
+    } else if (inTouchRect(point.x, point.y, 86, 282, 70, 28, 5)) {
       event.action = UIAction::WifiDelete;
-    } else if (inTouchRect(point.x, point.y, 162, 282, 70, 28)) {
+    } else if (inTouchRect(point.x, point.y, 162, 282, 70, 28, 5)) {
       event.action = UIAction::WifiToggle;
-    } else if (inTouchRect(point.x, point.y, 238, 282, 34, 28)) {
+    } else if (inRect(point.x, point.y, 234, 276, 40, 40)) {
       event.action = UIAction::WifiMoveUp;
-    } else if (inTouchRect(point.x, point.y, 276, 282, 34, 28)) {
+    } else if (inRect(point.x, point.y, 274, 276, 42, 40)) {
       event.action = UIAction::WifiMoveDown;
-    } else if (inTouchRect(point.x, point.y, 10, 322, 90, 28)) {
+    } else if (inTouchRect(point.x, point.y, 10, 322, 90, 28, 6)) {
       event.action = UIAction::WifiExport;
-    } else if (inTouchRect(point.x, point.y, 108, 322, 90, 28)) {
+    } else if (inTouchRect(point.x, point.y, 108, 322, 90, 28, 6)) {
       event.action = UIAction::WifiImport;
-    } else if (inTouchRect(point.x, point.y, 206, 322, 104, 28)) {
+    } else if (inTouchRect(point.x, point.y, 206, 322, 104, 28, 6)) {
       event.action = UIAction::ResetWiFiHold;
     }
     if (event.action != UIAction::None) dirty_ = true;
   } else if (screen == ScreenId::Settings) {
-    if (inTouchRect(point.x, point.y, 226, 42, 36, 28)) event.action = UIAction::LatMinus;
-    else if (inTouchRect(point.x, point.y, 270, 42, 36, 28)) event.action = UIAction::LatPlus;
-    else if (inTouchRect(point.x, point.y, 226, 82, 36, 28)) event.action = UIAction::LonMinus;
-    else if (inTouchRect(point.x, point.y, 270, 82, 36, 28)) event.action = UIAction::LonPlus;
-    else if (inTouchRect(point.x, point.y, 206, 122, 100, 28)) event.action = UIAction::RangeNext;
+    if (inTouchRect(point.x, point.y, 226, 42, 36, 28, 5)) event.action = UIAction::LatMinus;
+    else if (inTouchRect(point.x, point.y, 270, 42, 36, 28, 5)) event.action = UIAction::LatPlus;
+    else if (inTouchRect(point.x, point.y, 226, 82, 36, 28, 5)) event.action = UIAction::LonMinus;
+    else if (inTouchRect(point.x, point.y, 270, 82, 36, 28, 5)) event.action = UIAction::LonPlus;
+    else if (inTouchRect(point.x, point.y, 206, 122, 100, 28, 8)) event.action = UIAction::RangeNext;
     else if (inTouchRect(point.x, point.y, 110, 162, 86, 28)) event.action = UIAction::ToggleTheme;
     else if (inTouchRect(point.x, point.y, 206, 162, 100, 28)) event.action = UIAction::ToggleRadarMode;
     else if (inTouchRect(point.x, point.y, 110, 202, 86, 28)) event.action = UIAction::ToggleGpsLogging;
@@ -1047,10 +1058,10 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inTouchRect(point.x, point.y, 206, 242, 100, 28)) event.action = UIAction::AirportLabelNext;
     else if (inTouchRect(point.x, point.y, 110, 282, 86, 28)) event.action = UIAction::CenterModeNext;
     else if (inTouchRect(point.x, point.y, 206, 282, 100, 28)) event.action = UIAction::RefreshRateNext;
-    else if (inTouchRect(point.x, point.y, 10, 334, 72, 30)) event.action = UIAction::ResetWiFiHold;
-    else if (inTouchRect(point.x, point.y, 88, 334, 68, 30)) event.action = UIAction::ShowWiFiSettings;
-    else if (inTouchRect(point.x, point.y, 162, 334, 74, 30)) event.action = UIAction::RebootDevice;
-    else if (inTouchRect(point.x, point.y, 242, 334, 68, 30)) event.action = UIAction::SaveSettings;
+    else if (inTouchRect(point.x, point.y, 10, 334, 72, 30, 6)) event.action = UIAction::ResetWiFiHold;
+    else if (inTouchRect(point.x, point.y, 88, 334, 68, 30, 6)) event.action = UIAction::ShowWiFiSettings;
+    else if (inTouchRect(point.x, point.y, 162, 334, 74, 30, 6)) event.action = UIAction::RebootDevice;
+    else if (inTouchRect(point.x, point.y, 242, 334, 68, 30, 6)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }
   return event;
