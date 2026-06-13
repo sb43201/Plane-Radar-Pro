@@ -212,15 +212,41 @@ void DisplayUI::button(int16_t x, int16_t y, int16_t w, int16_t h, const String 
 void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, uint16_t outlineColor,
                                  bool selected) {
   const float angle = (isnan(heading) ? 0 : heading) * PI / 180.0f;
-  const int16_t noseX = x + roundf(sinf(angle) * 10);
-  const int16_t noseY = y - roundf(cosf(angle) * 10);
-  const int16_t leftX = x + roundf(sinf(angle + 2.45f) * 8);
-  const int16_t leftY = y - roundf(cosf(angle + 2.45f) * 8);
-  const int16_t rightX = x + roundf(sinf(angle - 2.45f) * 8);
-  const int16_t rightY = y - roundf(cosf(angle - 2.45f) * 8);
+  const float s = sinf(angle);
+  const float c = cosf(angle);
+  auto tx = [&](float lx, float ly) -> int16_t { return x + lroundf(lx * c - ly * s); };
+  auto ty = [&](float lx, float ly) -> int16_t { return y + lroundf(lx * s + ly * c); };
+
+  const int16_t noseX = tx(0, -13);
+  const int16_t noseY = ty(0, -13);
+  const int16_t bodyRX = tx(3, 7);
+  const int16_t bodyRY = ty(3, 7);
+  const int16_t bodyLX = tx(-3, 7);
+  const int16_t bodyLY = ty(-3, 7);
+  const int16_t wingRX = tx(13, 2);
+  const int16_t wingRY = ty(13, 2);
+  const int16_t wingLX = tx(-13, 2);
+  const int16_t wingLY = ty(-13, 2);
+  const int16_t tailRX = tx(8, 11);
+  const int16_t tailRY = ty(8, 11);
+  const int16_t tailLX = tx(-8, 11);
+  const int16_t tailLY = ty(-8, 11);
+  const int16_t tailCX = tx(0, 7);
+  const int16_t tailCY = ty(0, 7);
+
   tft_.drawCircle(x, y, 12, outlineColor);
-  tft_.fillTriangle(noseX, noseY, leftX, leftY, rightX, rightY, color);
-  tft_.drawTriangle(noseX, noseY, leftX, leftY, rightX, rightY, outlineColor);
+  tft_.fillTriangle(noseX, noseY, bodyRX, bodyRY, bodyLX, bodyLY, color);
+  tft_.fillTriangle(tx(0, -2), ty(0, -2), wingRX, wingRY, wingLX, wingLY, color);
+  tft_.fillTriangle(tailCX, tailCY, tailRX, tailRY, tailLX, tailLY, color);
+
+  tft_.drawLine(noseX, noseY, wingRX, wingRY, outlineColor);
+  tft_.drawLine(wingRX, wingRY, bodyRX, bodyRY, outlineColor);
+  tft_.drawLine(bodyRX, bodyRY, tailRX, tailRY, outlineColor);
+  tft_.drawLine(tailRX, tailRY, tailCX, tailCY, outlineColor);
+  tft_.drawLine(tailCX, tailCY, tailLX, tailLY, outlineColor);
+  tft_.drawLine(tailLX, tailLY, bodyLX, bodyLY, outlineColor);
+  tft_.drawLine(bodyLX, bodyLY, wingLX, wingLY, outlineColor);
+  tft_.drawLine(wingLX, wingLY, noseX, noseY, outlineColor);
   if (selected) {
     tft_.drawCircle(x, y, 14, outlineColor);
     tft_.drawCircle(x, y, 15, outlineColor);
