@@ -380,6 +380,8 @@ Radar center modes:
 
 Tapping an airport and choosing `Center Radar Here` switches to APT center mode. This does not overwrite the saved manual latitude/longitude shown on the Setup page. To switch back, open `Setup` and tap `Center` until the desired mode is shown.
 
+To save the current GPS fix as the default Manual home location, set `Center` to `GPS`, wait for a GPS fix, then tap `Save`. Plane Radar Pro copies the current GPS latitude/longitude into the saved Manual home position and switches `Center` back to `Manual`.
+
 ## Touchscreen Calibration
 
 Touch calibration is built into the firmware.

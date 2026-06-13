@@ -689,6 +689,17 @@ void handleUiEvent(const UIEvent &event) {
       if (settings.homeLon < -180.0f) settings.homeLon = 180.0f;
       break;
     case UIAction::SaveSettings:
+      if (settings.centerMode == CENTER_GPS) {
+        if (gps.hasFix()) {
+          settings.homeLat = gps.latitude();
+          settings.homeLon = gps.longitude();
+          settings.centerMode = CENTER_MANUAL;
+          Serial.printf("[settings] GPS saved as manual home=(%.5f, %.5f)\n", settings.homeLat, settings.homeLon);
+        } else {
+          lastUpdateText = "No GPS fix";
+          Serial.println("[settings] Save GPS requested but no fix is available");
+        }
+      }
       settingsStore.save(settings);
       lastAdsbMs = 0;
       Serial.printf("[settings] saved home=(%.5f, %.5f)\n", settings.homeLat, settings.homeLon);
