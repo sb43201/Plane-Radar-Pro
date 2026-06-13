@@ -12,9 +12,16 @@ pio run -t upload
 pio device monitor -b 115200
 ```
 
-On first boot, connect your phone to the `PlaneRadar-Setup` captive portal and open `192.168.4.1`. Choose your phone hotspot SSID, enter the password, and the ESP32 will save the credentials in flash/NVS. Future boots retry the saved hotspot for up to 60 seconds before opening setup mode again.
+On first boot, connect your phone to the `PlaneRadar-Setup` captive portal and open `192.168.4.1`. Choose your phone hotspot SSID, enter the password, and the ESP32 will save the credentials in flash/NVS. Future boots try saved networks by priority before opening setup mode again.
 
 To clear saved WiFi, open `Setup` on the touchscreen and hold `Reset WiFi` for 3 seconds. The ESP32 clears the saved credentials, restarts, and opens `PlaneRadar-Setup`.
+
+Hotspot tips:
+
+- ESP32 only sees 2.4 GHz WiFi. Enable iPhone `Maximize Compatibility` or set Android hotspot band to `2.4 GHz`.
+- If your phone cannot broadcast its hotspot while connected to `PlaneRadar-Setup`, use a second phone/laptop to open the setup portal.
+- Plane Radar Pro supports up to 10 saved WiFi networks. Use `Setup > WiFi` to add networks, delete networks, enable/disable them, move priority up/down, or export/import `/wifi_config.json` from SD.
+- To switch between home WiFi and phone hotspot without touching settings, save both networks and keep both enabled. The ESP32 will connect to the best available saved network by priority.
 
 ## Hardware
 

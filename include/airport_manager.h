@@ -24,6 +24,7 @@ class AirportManager {
   bool refreshIfDue(double homeLat, double homeLon, bool force = false);
   const std::vector<Airport> &airports() const { return airports_; }
   const Airport *findByCode(const String &code) const;
+  bool findInDatabaseByCode(const String &code, Airport &airport) const;
   String statusText() const;
   bool hasWarning() const { return warning_.length() > 0; }
   const String &warning() const { return warning_; }
@@ -41,7 +42,7 @@ class AirportManager {
   double lastLat_ = NAN;
   double lastLon_ = NAN;
 
-  bool parseCsvLine(const String &line, Airport &airport) const;
-  static String csvField(const String &line, uint8_t targetIndex);
+  bool parseCsvLine(const char *line, Airport &airport) const;
+  static String csvField(const char *line, uint8_t targetIndex);
   void sortAndTrim();
 };

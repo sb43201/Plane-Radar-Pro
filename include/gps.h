@@ -20,4 +20,6 @@ class GPSModule {
  private:
   TinyGPSPlus gps_;
   uint32_t lastDataMs_ = 0;
+  uint32_t lastDebugMs_ = 0;
+  uint32_t lastCharsProcessed_ = 0;
 };

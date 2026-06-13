@@ -173,19 +173,133 @@ Setup flow:
 3. If it does not connect automatically, connect your phone to `PlaneRadar-Setup`.
 4. Open `192.168.4.1` in your phone browser.
 5. Select your phone hotspot SSID.
-6. Enter the hotspot password and save.
-7. The ESP32 saves credentials and restarts into radar mode.
+6. Enter the hotspot password.
+7. Optional: enter a center airport code such as `IND` or `KIND`.
+8. Optional: enter manual home latitude and longitude.
+9. Save.
 
-Future boots retry the saved hotspot for up to 60 seconds before opening setup mode again.
+The captive portal center airport and home latitude/longitude fields are optional. If an airport code is entered, Plane Radar Pro uses that airport as the radar center without overwriting the manual home latitude/longitude. If latitude/longitude are entered instead, Plane Radar Pro switches to Manual center mode. If GPS has a fix, you can select GPS center mode later from `Setup`.
+10. The ESP32 saves credentials and restarts into radar mode.
+
+Future boots try saved networks by priority, using up to 30 seconds per attempt, before opening setup mode.
+
+Phone hotspot notes:
+
+- ESP32 WiFi is 2.4 GHz only. If your phone hotspot is 5 GHz only, it will not appear in the setup portal.
+- On iPhone, turn on `Maximize Compatibility` in Personal Hotspot.
+- On Android, set the hotspot AP band to `2.4 GHz` when that option is available.
+- Keep the hotspot screen open while scanning if your phone sleeps or disables discovery.
+- Some phones cannot broadcast a hotspot while also connected to `PlaneRadar-Setup`. In that case, use two devices:
+  1. Phone A: turn on hotspot.
+  2. Phone/laptop B: connect to `PlaneRadar-Setup`.
+  3. On Phone/laptop B, open `192.168.4.1`.
+  4. Select Phone A's hotspot SSID and save.
+
+## Switching Between Home WiFi And Phone Hotspot
+
+Plane Radar Pro supports up to 10 saved WiFi networks. Each saved network has:
+
+- SSID
+- Password, stored but not displayed
+- Priority order
+- Enabled/disabled state
+
+At boot, Plane Radar Pro loads the saved network list, sorts it by priority, and tries enabled networks in order. It tries each network for up to 30 seconds and retries before moving to the next one. If none connect, it opens the `PlaneRadar-Setup` captive portal.
+
+Best no-reset method:
+
+1. Save both your home WiFi and phone hotspot in WiFi Settings.
+2. Put the network you prefer first in priority order.
+3. Enable both networks.
+4. When you are home, Plane Radar Pro connects to home WiFi.
+5. When traveling, turn on the phone hotspot and Plane Radar Pro connects to the hotspot.
+
+Alternative simple method:
+
+Set your phone hotspot SSID and password to exactly match your home WiFi SSID and password. Then the ESP32 can use the same saved credentials for both.
+
+## Multi-WiFi Support
+
+Open `Setup`, then tap `WiFi` to open the WiFi Settings page.
+
+The WiFi Settings page shows:
+
+- Saved networks
+- Priority number
+- Enabled/disabled state
+- Connected network
+- IP address
+- RSSI signal strength
+
+Controls:
+
+| Control | Action |
+| --- | --- |
+| Saved network row | Select network |
+| Add | Opens `PlaneRadar-Setup` portal to add/update a network |
+| Delete | Deletes the selected network |
+| On/Off | Enables or disables the selected network |
+| Up | Moves selected network higher priority |
+| Dn | Moves selected network lower priority |
+| Export | Saves `/wifi_config.json` to SD card |
+| Import | Loads `/wifi_config.json` from SD card |
+| Reset WiFi | Hold 3 seconds to clear all saved WiFi |
+
+The `On/Off` button does not delete a network. It only enables or disables the selected saved network. Disabled networks keep their password but are skipped during startup and reconnect attempts.
+
+Adding a network:
+
+1. Tap `Setup`.
+2. Tap `WiFi`.
+3. Tap `Add`.
+4. Connect your phone/laptop to `PlaneRadar-Setup`.
+5. Open `192.168.4.1`.
+6. Select the WiFi network or phone hotspot.
+7. Enter the password.
+8. Optional: enter a center airport code.
+9. Optional: update the manual home latitude and longitude.
+10. Save.
+
+You do not need to disconnect from the current WiFi before adding a new home WiFi or phone hotspot. The new network is added to the saved list, and existing networks remain saved unless you delete them or disable them with `On/Off`.
+
+Passwords are not shown on the ESP32 screen. They are stored in ESP32 Preferences/NVS and can be exported to SD card only if you choose `Export`.
+
+SD backup file:
+
+```text
+/wifi_config.json
+```
+
+Example:
+
+```json
+{
+  "networks": [
+    {
+      "ssid": "Bin-iPhone",
+      "password": "xxxx",
+      "priority": 1,
+      "enabled": true
+    }
+  ]
+}
+```
+
+Automatic reconnect:
+
+- If WiFi drops while running, the UI stays active.
+- Plane Radar Pro retries every 10 seconds.
+- If the current SSID is unavailable, it tries other enabled saved networks.
 
 ## Reset WiFi
 
 To clear saved WiFi credentials:
 
 1. Tap `Setup`.
-2. Press and hold `Reset WiFi` for 3 seconds.
-3. The ESP32 clears saved WiFi credentials.
-4. The ESP32 restarts and reopens `PlaneRadar-Setup`.
+2. Tap `WiFi` if you want to manage the full network list, or use `Reset WiFi` from Setup.
+3. Press and hold `Reset WiFi` for 3 seconds.
+4. The ESP32 clears saved WiFi credentials.
+5. The ESP32 restarts and reopens `PlaneRadar-Setup`.
 
 ## Radar Screen
 
@@ -212,6 +326,17 @@ Aircraft altitude colors:
 | Red | Below 5000 ft or unknown |
 | Yellow | 5000 to 20000 ft |
 | Green | Above 20000 ft |
+
+Aircraft marker shapes:
+
+| Marker | Meaning |
+| --- | --- |
+| Rotated triangle | Aircraft position and track/heading |
+| Circle around triangle | Contrast ring to make the aircraft visible, especially in daylight mode |
+| Double/thicker circle | Selected aircraft |
+| Red edge marker | Aircraft just outside the selected radar range |
+
+The circle around an aircraft is not an alert by itself. Alerts are shown in the alert banner below the radar scope.
 
 Tap an aircraft icon to open the aircraft detail page.
 
@@ -240,8 +365,22 @@ Settings screen:
 | Airport Label Distance | Cycle 10, 25, 50, 100, 150 km |
 | Cal Touch | Start four-point touchscreen calibration |
 | Log On / Log Off | Toggle GPS location logging |
-| Reset WiFi | Hold 3 seconds to reset WiFi |
+| Center | Cycle radar center source: Manual, GPS, or APT |
+| WiFi | Open multi-network WiFi Settings |
+| Reset / Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
+
+Radar center modes:
+
+| Mode | Meaning |
+| --- | --- |
+| Manual | Use the entered/saved latitude and longitude |
+| GPS | Use the current live GPS fix when available |
+| APT | Use the selected airport or airport code |
+
+Tapping an airport and choosing `Center Radar Here` switches to APT center mode. This does not overwrite the saved manual latitude/longitude shown on the Setup page. To switch back, open `Setup` and tap `Center` until the desired mode is shown.
+
+To save the current GPS fix as the default Manual home location, set `Center` to `GPS`, wait for a GPS fix, then tap `Save`. Plane Radar Pro copies the current GPS latitude/longitude into the saved Manual home position and switches `Center` back to `Manual`.
 
 ## Touchscreen Calibration
 

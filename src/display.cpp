@@ -1,6 +1,7 @@
 #include "display.h"
 
 #include <math.h>
+#include <WiFi.h>
 
 #include "config.h"
 #include "radar.h"
@@ -8,6 +9,10 @@
 namespace {
 bool inRect(int16_t x, int16_t y, int16_t rx, int16_t ry, int16_t rw, int16_t rh) {
   return x >= rx && x <= rx + rw && y >= ry && y <= ry + rh;
+}
+
+bool inTouchRect(int16_t x, int16_t y, int16_t rx, int16_t ry, int16_t rw, int16_t rh, int16_t margin = 8) {
+  return inRect(x, y, rx - margin, ry - margin, rw + margin * 2, rh + margin * 2);
 }
 
 String altText(int32_t alt) {
@@ -31,6 +36,84 @@ String safeFlight(const Aircraft &a) {
 
 String aircraftSubtitle(const Aircraft &a) {
   return a.type.length() ? a.type : (a.category.length() ? a.category : String("---"));
+}
+
+float angleDiff(float a, float b) {
+  float diff = fabsf(a - b);
+  while (diff >= 360.0f) diff -= 360.0f;
+  return diff > 180.0f ? 360.0f - diff : diff;
+}
+
+const char *uiActionName(UIAction action) {
+  switch (action) {
+    case UIAction::None:
+      return "None";
+    case UIAction::ShowRadar:
+      return "ShowRadar";
+    case UIAction::ShowList:
+      return "ShowList";
+    case UIAction::ShowAirportList:
+      return "ShowAirportList";
+    case UIAction::ShowSettings:
+      return "ShowSettings";
+    case UIAction::ShowWiFiSettings:
+      return "ShowWiFiSettings";
+    case UIAction::ShowDetail:
+      return "ShowDetail";
+    case UIAction::ShowAirportDetail:
+      return "ShowAirportDetail";
+    case UIAction::CenterOnAirport:
+      return "CenterOnAirport";
+    case UIAction::StartTouchCalibration:
+      return "StartTouchCalibration";
+    case UIAction::RangeNext:
+      return "RangeNext";
+    case UIAction::ToggleTheme:
+      return "ToggleTheme";
+    case UIAction::ToggleGpsLogging:
+      return "ToggleGpsLogging";
+    case UIAction::ToggleRadarMode:
+      return "ToggleRadarMode";
+    case UIAction::ToggleAirportOverlay:
+      return "ToggleAirportOverlay";
+    case UIAction::AirportLabelNext:
+      return "AirportLabelNext";
+    case UIAction::RefreshRateNext:
+      return "RefreshRateNext";
+    case UIAction::CenterModeNext:
+      return "CenterModeNext";
+    case UIAction::LatPlus:
+      return "LatPlus";
+    case UIAction::LatMinus:
+      return "LatMinus";
+    case UIAction::LonPlus:
+      return "LonPlus";
+    case UIAction::LonMinus:
+      return "LonMinus";
+    case UIAction::SaveSettings:
+      return "SaveSettings";
+    case UIAction::RebootDevice:
+      return "RebootDevice";
+    case UIAction::SelectWifiNetwork:
+      return "SelectWifiNetwork";
+    case UIAction::WifiAddPortal:
+      return "WifiAddPortal";
+    case UIAction::WifiDelete:
+      return "WifiDelete";
+    case UIAction::WifiMoveUp:
+      return "WifiMoveUp";
+    case UIAction::WifiMoveDown:
+      return "WifiMoveDown";
+    case UIAction::WifiToggle:
+      return "WifiToggle";
+    case UIAction::WifiExport:
+      return "WifiExport";
+    case UIAction::WifiImport:
+      return "WifiImport";
+    case UIAction::ResetWiFiHold:
+      return "ResetWiFiHold";
+  }
+  return "Unknown";
 }
 
 void drawEdgeMarker(TFT_eSPI &tft, int16_t cx, int16_t cy, int16_t radius, float bearingDeg, float distanceKm,
@@ -96,7 +179,7 @@ uint16_t DisplayUI::panel(const AppSettings &settings) const {
 }
 
 uint16_t DisplayUI::accent(const AppSettings &settings) const {
-  return settings.nightMode ? TFT_CYAN : TFT_BLUE;
+  return settings.nightMode ? 0x055F : TFT_BLUE;
 }
 
 uint16_t DisplayUI::altitudeColor(int32_t altFt) const {
@@ -121,22 +204,27 @@ void DisplayUI::button(int16_t x, int16_t y, int16_t w, int16_t h, const String 
   tft_.drawRoundRect(x, y, w, h, 6, TFT_DARKGREY);
   tft_.setTextColor(text, fill);
   tft_.setTextDatum(MC_DATUM);
-  tft_.setTextFont(w < 56 ? 1 : 2);
+  tft_.setTextFont(w < 58 ? 1 : 2);
   tft_.drawString(label, x + w / 2, y + h / 2 - 1);
   tft_.setTextDatum(TL_DATUM);
 }
 
-void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, bool selected) {
+void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t color, uint16_t outlineColor,
+                                 bool selected) {
   const float angle = (isnan(heading) ? 0 : heading) * PI / 180.0f;
-  const int16_t noseX = x + roundf(sinf(angle) * 10);
-  const int16_t noseY = y - roundf(cosf(angle) * 10);
-  const int16_t leftX = x + roundf(sinf(angle + 2.45f) * 8);
-  const int16_t leftY = y - roundf(cosf(angle + 2.45f) * 8);
-  const int16_t rightX = x + roundf(sinf(angle - 2.45f) * 8);
-  const int16_t rightY = y - roundf(cosf(angle - 2.45f) * 8);
+  const int16_t noseX = x + lroundf(sinf(angle) * 10);
+  const int16_t noseY = y - lroundf(cosf(angle) * 10);
+  const int16_t leftX = x + lroundf(sinf(angle + 2.45f) * 8);
+  const int16_t leftY = y - lroundf(cosf(angle + 2.45f) * 8);
+  const int16_t rightX = x + lroundf(sinf(angle - 2.45f) * 8);
+  const int16_t rightY = y - lroundf(cosf(angle - 2.45f) * 8);
+  tft_.drawCircle(x, y, 12, outlineColor);
   tft_.fillTriangle(noseX, noseY, leftX, leftY, rightX, rightY, color);
-  tft_.drawTriangle(noseX, noseY, leftX, leftY, rightX, rightY, TFT_BLACK);
-  if (selected) tft_.drawCircle(x, y, 13, TFT_WHITE);
+  tft_.drawTriangle(noseX, noseY, leftX, leftY, rightX, rightY, outlineColor);
+  if (selected) {
+    tft_.drawCircle(x, y, 14, outlineColor);
+    tft_.drawCircle(x, y, 15, outlineColor);
+  }
 }
 
 void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
@@ -149,8 +237,9 @@ void DisplayUI::drawBottomNav(const AppSettings &settings, ScreenId active) {
          active == ScreenId::Radar ? accent(settings) : muted(settings), TFT_WHITE);
   button(gap * 2 + w, y + 5, w, 28, "AC", active == ScreenId::AircraftList ? accent(settings) : muted(settings),
          TFT_WHITE);
-  button(gap * 3 + w * 2, y + 5, w, 28, "APT", active == ScreenId::AirportList ? accent(settings) : panel(settings),
-         active == ScreenId::AirportList ? TFT_WHITE : fg(settings));
+  const bool airportActive = active == ScreenId::AirportList || active == ScreenId::AirportDetail;
+  button(gap * 3 + w * 2, y + 5, w, 28, "APT", airportActive ? accent(settings) : panel(settings),
+         airportActive ? TFT_WHITE : fg(settings));
   button(gap * 4 + w * 3, y + 5, w, 28, compact ? "Rng" : "Range", panel(settings), fg(settings));
   button(gap * 5 + w * 4, y + 5, w, 28, compact ? "Set" : "Setup",
          active == ScreenId::Settings ? accent(settings) : muted(settings),
@@ -164,20 +253,30 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
                           const String &airportStatus, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  const uint16_t scopeBg = settings.scopeMode ? TFT_BLACK : bg(settings);
-  const uint16_t grid = settings.scopeMode ? 0x07E0 : accent(settings);
-  const uint16_t gridDim = settings.scopeMode ? 0x03A0 : muted(settings);
-  const uint16_t text = settings.scopeMode ? 0xB7FF : fg(settings);
-  const uint16_t dimText = settings.scopeMode ? 0x7BEF : muted(settings);
-  const uint16_t airportColor = settings.scopeMode ? TFT_MAGENTA : TFT_ORANGE;
-  tft_.fillScreen(scopeBg);
+  const bool scopeStyle = settings.scopeMode && settings.nightMode;
+  const uint16_t scopeBg = scopeStyle ? TFT_BLACK : bg(settings);
+  const uint16_t grid = scopeStyle ? 0x07E0 : accent(settings);
+  const uint16_t gridDim = scopeStyle ? 0x03A0 : muted(settings);
+  const uint16_t text = scopeStyle ? 0xB7FF : fg(settings);
+  const uint16_t dimText = scopeStyle ? 0x7BEF : muted(settings);
+  const uint16_t airportColor = scopeStyle ? TFT_MAGENTA : TFT_ORANGE;
+  const uint16_t aircraftOutline = scopeStyle ? TFT_WHITE : TFT_BLACK;
+  const int16_t navY = tft_.height() - 38;
+  tft_.startWrite();
+  if (force) {
+    tft_.fillScreen(scopeBg);
+  } else {
+    tft_.fillRect(0, 0, tft_.width(), navY, scopeBg);
+  }
 
+  const bool compactScreen = tft_.height() < 400;
   const int16_t cx = tft_.width() / 2;
-  const int16_t cy = 190;
-  const int16_t radius = min((int16_t)132, (int16_t)((tft_.width() - 42) / 2));
+  const int16_t cy = compactScreen ? 136 : 190;
+  const int16_t radius = compactScreen ? min((int16_t)86, (int16_t)((tft_.width() - 48) / 2))
+                                       : min((int16_t)132, (int16_t)((tft_.width() - 42) / 2));
 
-  tft_.drawCircle(cx, cy, radius + 5, settings.scopeMode ? 0x39E7 : gridDim);
-  tft_.drawCircle(cx, cy, radius + 2, settings.scopeMode ? 0x18E3 : panel(settings));
+  tft_.drawCircle(cx, cy, radius + 5, scopeStyle ? 0x39E7 : gridDim);
+  tft_.drawCircle(cx, cy, radius + 2, scopeStyle ? 0x18E3 : panel(settings));
   for (uint8_t ring = 1; ring <= 4; ++ring) {
     tft_.drawCircle(cx, cy, radius * ring / 4, gridDim);
   }
@@ -205,7 +304,7 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
   tft_.setTextFont(1);
   tft_.setTextColor(text, scopeBg);
   tft_.drawString(settings.scopeMode ? "SCOPE" : "RADAR", 6, 4);
-  tft_.drawString("AC " + String(aircraft.size()), 58, 4);
+  tft_.drawString("Tracked " + String(aircraft.size()), 58, 4);
   tft_.drawString("WiFi " + wifiStatus, 6, 16);
   tft_.drawString("GPS " + gpsStatus, 6, 28);
   tft_.setTextDatum(TR_DATUM);
@@ -246,6 +345,11 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     }
   }
 
+  std::vector<uint16_t> labelOrder;
+  if (aircraft.size() > 14) {
+    labelOrder = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, min((size_t)10, aircraft.size()));
+  }
+
   for (const Aircraft &a : aircraft) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
     if (!p.visible) {
@@ -254,9 +358,19 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
       }
       continue;
     }
-    drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), selectedHex_ == a.hex);
-    const int16_t labelX = p.x < cx ? p.x + 10 : p.x - 58;
-    const int16_t labelY = p.y - 16;
+    drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), aircraftOutline, selectedHex_ == a.hex);
+    bool showLabel = aircraft.size() <= 14 || selectedHex_ == a.hex;
+    if (!showLabel) {
+      for (uint16_t idx : labelOrder) {
+        if (idx < aircraft.size() && aircraft[idx].hex == a.hex) {
+          showLabel = true;
+          break;
+        }
+      }
+    }
+    if (!showLabel) continue;
+    const int16_t labelX = p.x < cx ? min((int16_t)(p.x + 9), (int16_t)(tft_.width() - 62)) : max((int16_t)2, (int16_t)(p.x - 52));
+    const int16_t labelY = p.y < cy ? p.y + 8 : p.y - 28;
     tft_.setTextFont(1);
     tft_.setTextColor(altitudeColor(a.altBaro), scopeBg);
     tft_.drawString(safeFlight(a), labelX, labelY);
@@ -264,20 +378,10 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     tft_.drawString(altText(a.altBaro), labelX, labelY + 18);
   }
 
-  if (alertText.length()) {
-    const uint16_t fill = 0xA000;
-    tft_.fillRoundRect(46, 52, tft_.width() - 92, 20, 4, fill);
-    tft_.setTextColor(TFT_WHITE, fill);
-    tft_.setTextDatum(MC_DATUM);
-    tft_.setTextFont(1);
-    tft_.drawString(alertText, tft_.width() / 2, 62);
-    tft_.setTextDatum(TL_DATUM);
-  }
-
   if (gpsCompass.length()) {
-    const int16_t compassY = alertText.length() ? 76 : 52;
+    const int16_t compassY = 52;
     const int16_t compassX = tft_.width() - 92;
-    const uint16_t compassFill = settings.scopeMode ? 0x0841 : panel(settings);
+    const uint16_t compassFill = scopeStyle ? 0x0841 : panel(settings);
     tft_.fillRoundRect(compassX, compassY, 86, 20, 4, compassFill);
     tft_.setTextColor(text, compassFill);
     tft_.setTextDatum(MC_DATUM);
@@ -286,43 +390,104 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     tft_.setTextDatum(TL_DATUM);
   }
 
-  drawBottomNav(settings, ScreenId::Radar);
+  String nearestAirportText = airportStatus;
+  if (settings.airportOverlay && !airports.empty()) {
+    const Airport &nearestAirport = airports.front();
+    nearestAirportText = "NEAREST " + AirportManager::displayCode(nearestAirport) + "  " +
+                         String(nearestAirport.distanceKm, 1) + " km";
+  }
+
+  const int16_t statsY = compactScreen ? min((int16_t)(cy + radius + 8), (int16_t)(navY - 54))
+                                       : (int16_t)(cy + radius + 18);
+  const uint16_t statFill = scopeStyle ? 0x0841 : panel(settings);
+  tft_.fillRoundRect(10, statsY, tft_.width() - 20, compactScreen ? 50 : 92, 6, statFill);
+  tft_.setTextDatum(MC_DATUM);
+  tft_.setTextFont(compactScreen ? 2 : 4);
+  tft_.setTextColor(text, statFill);
+  tft_.drawString(String(settings.rangeKm) + " km", tft_.width() / 2, statsY + (compactScreen ? 9 : 18));
+  tft_.setTextFont(compactScreen ? 1 : 2);
+  tft_.setTextColor(dimText, statFill);
+  tft_.drawString("SCAN RADIUS   " + String(aircraft.size()) + " AIRCRAFT", tft_.width() / 2,
+                  statsY + (compactScreen ? 26 : 43));
+  if (nearestAirportText.length()) {
+    tft_.setTextFont(1);
+    tft_.drawString(nearestAirportText, tft_.width() / 2, statsY + (compactScreen ? 40 : 62));
+  }
+  if (alertText.length() && !compactScreen) {
+    const uint16_t alertFill = 0xA000;
+    tft_.fillRoundRect(18, statsY + 72, tft_.width() - 36, 16, 4, alertFill);
+    tft_.setTextColor(TFT_WHITE, alertFill);
+    tft_.setTextFont(1);
+    tft_.drawString(alertText, tft_.width() / 2, statsY + 80);
+  }
+  tft_.setTextDatum(TL_DATUM);
+
+  if (force) drawBottomNav(settings, ScreenId::Radar);
+  tft_.endWrite();
 }
 
 void DisplayUI::drawAirportList(const AppSettings &settings, const std::vector<Airport> &airports, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
+  const bool compactScreen = tft_.height() < 400;
+  const uint8_t maxRows = compactScreen ? 5 : 8;
+  const uint8_t inRangeCount = airportInRangeCount(settings, airports);
+  if (inRangeCount <= maxRows) airportListOffset_ = 0;
+  else if (airportListOffset_ > inRangeCount - maxRows) airportListOffset_ = inRangeCount - maxRows;
+
   tft_.fillScreen(bg(settings));
-  header(settings, "Airports", String(airports.size()) + " nearby");
+  header(settings, "Airports", "<= " + String(settings.rangeKm) + " km");
   if (airports.empty()) {
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.setTextDatum(MC_DATUM);
     tft_.drawString("No airport database", tft_.width() / 2, tft_.height() / 2);
     tft_.setTextDatum(TL_DATUM);
   }
-  const uint8_t maxRows = min((size_t)5, airports.size());
-  for (uint8_t row = 0; row < maxRows; ++row) {
-    const Airport &airport = airports[row];
-    const int16_t y = 42 + row * 50;
-    tft_.fillRoundRect(8, y, tft_.width() - 16, 44, 5, panel(settings));
+  uint8_t row = 0;
+  uint8_t skipped = 0;
+  for (const Airport &airport : airports) {
+    if (airport.distanceKm > settings.rangeKm) continue;
+    if (skipped++ < airportListOffset_) continue;
+    if (row >= maxRows) break;
+    const int16_t y = 42 + row * 42;
+    tft_.fillRoundRect(8, y, tft_.width() - 16, 36, 5, panel(settings));
     tft_.setTextColor(TFT_BLUE, panel(settings));
-    tft_.drawString(AirportManager::displayCode(airport), 16, y + 4);
+    tft_.drawString(AirportManager::displayCode(airport), 16, y + 3);
     tft_.setTextColor(fg(settings), panel(settings));
     String name = airport.name;
-    if (name.length() > 18) name = name.substring(0, 18);
-    tft_.drawString(name, 62, y + 4);
+    if (name.length() > 20) name = name.substring(0, 20);
+    tft_.drawString(name, 62, y + 3);
     tft_.setTextColor(muted(settings), panel(settings));
-    tft_.drawString(String(airport.distanceKm, 0) + " km", 62, y + 22);
-    tft_.drawString(String(airport.bearingDeg, 0) + " deg", 132, y + 22);
+    tft_.drawString(String(airport.distanceKm, 1) + " km", 62, y + 19);
+    tft_.drawString(String(airport.bearingDeg, 0) + " deg", 144, y + 19);
+    row++;
+  }
+  if (!airports.empty() && inRangeCount == 0) {
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.drawString("No airports inside " + String(settings.rangeKm) + " km", tft_.width() / 2, tft_.height() / 2);
+    tft_.setTextDatum(TL_DATUM);
+  } else if (inRangeCount > maxRows) {
+    const int16_t scrollY = tft_.height() - 98;
+    button(10, scrollY, 86, 32, "Up", airportListOffset_ > 0 ? panel(settings) : muted(settings), fg(settings));
+    button(tft_.width() - 96, scrollY, 86, 32, "Down",
+           airportListOffset_ + maxRows < inRangeCount ? accent(settings) : muted(settings), TFT_WHITE);
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.drawString(String(airportListOffset_ + 1) + "-" + String(airportListOffset_ + row) + " / " +
+                        String(inRangeCount),
+                    tft_.width() / 2, scrollY + 15);
+    tft_.setTextDatum(TL_DATUM);
   }
   drawBottomNav(settings, ScreenId::AirportList);
 }
 
-void DisplayUI::drawAirportDetail(const AppSettings &settings, const Airport *airport, bool force) {
+void DisplayUI::drawAirportDetail(const AppSettings &settings, const Airport *airport,
+                                  const std::vector<Aircraft> &aircraft, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
-  header(settings, "Airport Detail", airport ? AirportManager::displayCode(*airport) : "Missing");
+  header(settings, "Airport Hub", airport ? AirportManager::displayCode(*airport) : "Missing");
   if (!airport) {
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.drawString("Airport is no longer loaded.", 18, 72);
@@ -330,40 +495,121 @@ void DisplayUI::drawAirportDetail(const AppSettings &settings, const Airport *ai
     return;
   }
 
+  uint16_t arrivals = 0;
+  uint16_t departures = 0;
+  int nearestIndex[3] = {-1, -1, -1};
+  float nearestDistance[3] = {99999.0f, 99999.0f, 99999.0f};
+
+  for (size_t i = 0; i < aircraft.size(); ++i) {
+    const Aircraft &a = aircraft[i];
+    if (isnan(a.lat) || isnan(a.lon)) continue;
+    const float d = Radar::distanceKm(airport->lat, airport->lon, a.lat, a.lon);
+    if (d <= settings.rangeKm && !isnan(a.track)) {
+      const float toAirport = Radar::bearingDeg(a.lat, a.lon, airport->lat, airport->lon);
+      const float fromAirport = Radar::bearingDeg(airport->lat, airport->lon, a.lat, a.lon);
+      if (angleDiff(a.track, toAirport) <= 55.0f) arrivals++;
+      else if (angleDiff(a.track, fromAirport) <= 55.0f) departures++;
+    }
+
+    for (uint8_t slot = 0; slot < 3; ++slot) {
+      if (d < nearestDistance[slot]) {
+        for (int8_t move = 2; move > slot; --move) {
+          nearestDistance[move] = nearestDistance[move - 1];
+          nearestIndex[move] = nearestIndex[move - 1];
+        }
+        nearestDistance[slot] = d;
+        nearestIndex[slot] = (int)i;
+        break;
+      }
+    }
+  }
+
+  const String code = AirportManager::displayCode(*airport);
+  tft_.setTextDatum(MC_DATUM);
+  tft_.setTextColor(accent(settings), bg(settings));
+  tft_.setTextFont(4);
+  tft_.drawString(code, tft_.width() / 2, 58);
+  tft_.setTextFont(2);
+  tft_.setTextColor(fg(settings), bg(settings));
+  tft_.drawString("Arrivals: " + String(arrivals) + "   Departures: " + String(departures), tft_.width() / 2, 92);
+  tft_.setTextDatum(TL_DATUM);
+
+  button(24, 112, tft_.width() - 48, 30, "Center Radar Here", accent(settings), TFT_WHITE);
+
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(2);
-  tft_.drawString(airport->name, 12, 44);
-  String rows[] = {
-      "Code: " + AirportManager::displayCode(*airport),
-      "Type: " + airport->type,
-      "Distance: " + String(airport->distanceKm, 1) + " km",
-      "Bearing: " + String(airport->bearingDeg, 0) + " deg",
-      "Lat: " + String(airport->lat, 5),
-      "Lon: " + String(airport->lon, 5),
-  };
-  for (uint8_t i = 0; i < 6; ++i) {
-    tft_.fillRoundRect(10, 78 + i * 34, tft_.width() - 20, 28, 5, panel(settings));
+  tft_.drawString("Nearest", 16, 154);
+  for (uint8_t row = 0; row < 3; ++row) {
+    const int16_t y = 178 + row * 34;
+    tft_.fillRoundRect(10, y, tft_.width() - 20, 28, 5, panel(settings));
     tft_.setTextColor(fg(settings), panel(settings));
-    tft_.drawString(rows[i], 18, 84 + i * 34);
+    if (nearestIndex[row] >= 0) {
+      const Aircraft &a = aircraft[nearestIndex[row]];
+      tft_.drawString(safeFlight(a), 18, y + 6);
+      tft_.setTextDatum(TR_DATUM);
+      tft_.drawString(String(nearestDistance[row], 1) + " km", tft_.width() - 18, y + 6);
+      tft_.setTextDatum(TL_DATUM);
+    } else {
+      tft_.setTextColor(muted(settings), panel(settings));
+      tft_.drawString("---", 18, y + 6);
+    }
+  }
+
+  String name = airport->name;
+  if (name.length() > 28) name = name.substring(0, 28);
+  String rows[] = {
+      name,
+      "Type: " + airport->type,
+      "From home: " + String(airport->distanceKm, 1) + " km @ " + String(airport->bearingDeg, 0) + " deg",
+      "Lat/Lon: " + String(airport->lat, 5) + ", " + String(airport->lon, 5),
+  };
+  for (uint8_t i = 0; i < 4; ++i) {
+    const int16_t y = 292 + i * 32;
+    tft_.fillRoundRect(10, y, tft_.width() - 20, 26, 5, panel(settings));
+    tft_.setTextColor(fg(settings), panel(settings));
+    tft_.drawString(rows[i], 18, y + 5);
   }
   drawBottomNav(settings, ScreenId::AirportDetail);
 }
 
-void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft, bool force) {
+void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<Aircraft> &aircraft,
+                                 const String &lastUpdateText, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
   header(settings, "Nearest Aircraft", String(aircraft.size()) + " tracked");
-  auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, 6);
+
+  const bool compactScreen = tft_.height() < 400;
+  const int16_t summaryY = 40;
+  tft_.fillRoundRect(8, summaryY, tft_.width() - 16, compactScreen ? 42 : 58, 6, panel(settings));
+  tft_.setTextDatum(MC_DATUM);
+  tft_.setTextFont(compactScreen ? 2 : 4);
+  tft_.setTextColor(accent(settings), panel(settings));
+  tft_.drawString(String(settings.rangeKm) + " km", tft_.width() / 2, summaryY + (compactScreen ? 10 : 18));
+  tft_.setTextFont(compactScreen ? 1 : 2);
+  tft_.setTextColor(fg(settings), panel(settings));
+  tft_.drawString("SCAN RADIUS   " + String(aircraft.size()) + " AIRCRAFT", tft_.width() / 2,
+                  summaryY + (compactScreen ? 28 : 42));
+  tft_.setTextDatum(TL_DATUM);
+  tft_.setTextFont(1);
+  tft_.setTextColor(muted(settings), bg(settings));
+  tft_.drawString(lastUpdateText, 12, compactScreen ? 88 : 104);
+
+  auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, aircraft.size());
+  const uint8_t maxRows = compactScreen ? 3 : 5;
+  if (order.size() <= maxRows) aircraftListOffset_ = 0;
+  else if (aircraftListOffset_ > order.size() - maxRows) aircraftListOffset_ = order.size() - maxRows;
+
   if (order.empty()) {
     tft_.setTextColor(muted(settings), bg(settings));
     tft_.setTextDatum(MC_DATUM);
-    tft_.drawString("No aircraft in range", tft_.width() / 2, tft_.height() / 2);
+    tft_.drawString("No aircraft in range", tft_.width() / 2, tft_.height() / 2 + 24);
     tft_.setTextDatum(TL_DATUM);
   }
-  for (uint8_t row = 0; row < order.size(); ++row) {
-    const Aircraft &a = aircraft[order[row]];
-    const int16_t y = 42 + row * 50;
+  const uint8_t visibleRows = min((size_t)maxRows, order.size());
+  for (uint8_t row = 0; row < visibleRows; ++row) {
+    const Aircraft &a = aircraft[order[aircraftListOffset_ + row]];
+    const int16_t y = (compactScreen ? 104 : 118) + row * 48;
     tft_.fillRoundRect(8, y, tft_.width() - 16, 44, 5, panel(settings));
     tft_.fillCircle(22, y + 15, 6, altitudeColor(a.altBaro));
     tft_.setTextColor(fg(settings), panel(settings));
@@ -372,10 +618,24 @@ void DisplayUI::drawAircraftList(const AppSettings &settings, const std::vector<
     tft_.drawString(aircraftSubtitle(a), 38, y + 18);
     tft_.setTextColor(fg(settings), panel(settings));
     const float d = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
-    tft_.drawString(String(d, 1) + " km", 124, y + 4);
-    tft_.drawString(altText(a.altBaro), 124, y + 18);
+    const int16_t infoX = compactScreen ? 124 : 150;
+    tft_.drawString(String(d, 1) + " km", infoX, y + 4);
+    tft_.drawString(altText(a.altBaro), compactScreen ? infoX : 218, compactScreen ? y + 18 : y + 4);
     tft_.setTextColor(muted(settings), panel(settings));
-    tft_.drawString(speedText(a.groundSpeed), 124, y + 32);
+    tft_.drawString(speedText(a.groundSpeed), infoX, compactScreen ? y + 32 : y + 22);
+  }
+  if (order.size() > maxRows) {
+    const int16_t scrollY = tft_.height() - 98;
+    button(10, scrollY, 86, 32, "Up", aircraftListOffset_ > 0 ? panel(settings) : muted(settings), fg(settings));
+    button(tft_.width() - 96, scrollY, 86, 32, "Down",
+           aircraftListOffset_ + maxRows < order.size() ? accent(settings) : muted(settings), TFT_WHITE);
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.setTextFont(1);
+    tft_.drawString(String(aircraftListOffset_ + 1) + "-" + String(aircraftListOffset_ + visibleRows) + " / " +
+                        String(order.size()),
+                    tft_.width() / 2, scrollY + 15);
+    tft_.setTextDatum(TL_DATUM);
   }
   drawBottomNav(settings, ScreenId::AircraftList);
 }
@@ -397,7 +657,7 @@ void DisplayUI::drawAircraftDetail(const AppSettings &settings, const Aircraft *
   tft_.setTextColor(fg(settings), bg(settings));
   tft_.setTextFont(4);
   tft_.drawString(safeFlight(a), 18, 52);
-  drawAircraftIcon(tft_.width() - 36, 68, a.track, altitudeColor(a.altBaro), false);
+  drawAircraftIcon(tft_.width() - 36, 68, a.track, altitudeColor(a.altBaro), fg(settings), false);
 
   tft_.setTextFont(2);
   const float dist = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
@@ -428,10 +688,9 @@ void DisplayUI::drawWiFiSetup(const AppSettings &settings, const String &savedSs
 
   tft_.setTextDatum(MC_DATUM);
   tft_.setTextColor(fg(settings), bg(settings));
-  tft_.setTextFont(2);
+  tft_.setTextFont(4);
   tft_.drawString("Connect phone to WiFi:", tft_.width() / 2, 78);
   tft_.setTextColor(accent(settings), bg(settings));
-  tft_.setTextFont(4);
   tft_.drawString(Config::WIFI_AP_NAME, tft_.width() / 2, 120);
   tft_.setTextFont(2);
   tft_.setTextColor(fg(settings), bg(settings));
@@ -477,50 +736,198 @@ void DisplayUI::drawTouchCalibration(const AppSettings &settings, uint8_t step, 
   tft_.setTextDatum(TL_DATUM);
 }
 
-void DisplayUI::drawSettings(const AppSettings &settings, bool force) {
+void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStatus, bool force) {
   if (!dirty_ && !force) return;
   dirty_ = false;
-  tft_.fillScreen(bg(settings));
-  header(settings, "Settings", settings.scopeMode ? "Scope" : "Radar");
-  tft_.setTextColor(fg(settings), bg(settings));
-  tft_.setTextFont(2);
-  const int16_t left = 8;
-  const int16_t valueX = 82;
-  const int16_t minusX = tft_.width() - 78;
-  const int16_t plusX = tft_.width() - 40;
-  const int16_t wideX = tft_.width() - 88;
-  const int16_t wideW = 80;
-  tft_.drawString("Lat", left, 42);
-  tft_.drawString(String(settings.homeLat, 4), valueX, 42);
-  button(minusX, 36, 32, 26, "-", panel(settings), fg(settings));
-  button(plusX, 36, 32, 26, "+", accent(settings), TFT_WHITE);
+  const uint16_t settingsBg = settings.nightMode ? TFT_BLACK : bg(settings);
+  const uint16_t settingsPanel = settings.nightMode ? 0x2945 : panel(settings);
+  const uint16_t settingsText = settings.nightMode ? TFT_WHITE : fg(settings);
+  const uint16_t settingsAccent = accent(settings);
+  String centerLabel = "Manual";
+  if (settings.centerMode == CENTER_GPS) centerLabel = "GPS";
+  else if (settings.centerMode == CENTER_AIRPORT) {
+    centerLabel = settings.airportCenterCode.length() ? "APT " + settings.airportCenterCode : "APT";
+    if (centerLabel.length() > 8) centerLabel = centerLabel.substring(0, 8);
+  }
+  auto settingsTextMode = [&]() {
+    tft_.setTextColor(settingsText, settingsBg);
+    tft_.setTextFont(2);
+    tft_.setTextDatum(TL_DATUM);
+  };
+  tft_.fillScreen(settingsBg);
+  String right = "WiFi " + wifiStatus;
+  if (right.length() > 20) right = right.substring(0, 20);
+  header(settings, "Settings", right);
+  if (tft_.width() < 300) {
+    const int16_t left = 6;
+    const int16_t valueX = 62;
+    const int16_t minusX = tft_.width() - 78;
+    const int16_t plusX = tft_.width() - 40;
+    const int16_t wideX = tft_.width() - 84;
+    const int16_t wideW = 78;
+    settingsTextMode();
+    tft_.setTextFont(1);
+    tft_.drawString("Lat", left, 38);
+    tft_.drawString(String(settings.homeLat, 4), valueX, 38);
+    button(minusX, 34, 32, 24, "-", settingsPanel, settingsText);
+    button(plusX, 34, 32, 24, "+", settingsAccent, TFT_WHITE);
 
-  tft_.drawString("Lon", left, 76);
-  tft_.drawString(String(settings.homeLon, 4), valueX, 76);
-  button(minusX, 70, 32, 26, "-", panel(settings), fg(settings));
-  button(plusX, 70, 32, 26, "+", accent(settings), TFT_WHITE);
+    settingsTextMode();
+    tft_.setTextFont(1);
+    tft_.drawString("Lon", left, 64);
+    tft_.drawString(String(settings.homeLon, 4), valueX, 64);
+    button(minusX, 60, 32, 24, "-", settingsPanel, settingsText);
+    button(plusX, 60, 32, 24, "+", settingsAccent, TFT_WHITE);
 
-  tft_.drawString("Range", left, 110);
-  tft_.drawString(String(settings.rangeKm) + " km", valueX, 110);
-  button(wideX, 104, wideW, 26, "Change", accent(settings), TFT_WHITE);
+    settingsTextMode();
+    tft_.setTextFont(1);
+    tft_.drawString("Range", left, 90);
+    tft_.drawString(String(settings.rangeKm) + " km", valueX, 90);
+    button(wideX, 86, wideW, 24, "Change", settingsAccent, TFT_WHITE);
 
-  tft_.drawString("Theme", left, 144);
-  button(valueX, 138, 66, 26, settings.nightMode ? "Night" : "Day", accent(settings), TFT_WHITE);
-  button(wideX, 138, wideW, 26, settings.scopeMode ? "Scope" : "Radar", accent(settings), TFT_WHITE);
+    settingsTextMode();
+    tft_.setTextFont(1);
+    tft_.drawString("Theme", left, 116);
+    button(valueX, 112, 64, 24, settings.nightMode ? "Night" : "Day", settingsAccent, TFT_WHITE);
+    button(wideX, 112, wideW, 24, settings.scopeMode ? "Scope" : "Radar", settingsAccent, TFT_WHITE);
 
-  tft_.drawString("GPS Log", left, 178);
-  button(valueX, 172, 66, 26, settings.gpsLogging ? "Log On" : "Log Off",
-         settings.gpsLogging ? TFT_GREEN : panel(settings), settings.gpsLogging ? TFT_BLACK : fg(settings));
-  button(wideX, 172, wideW, 26, "Cal", accent(settings), TFT_WHITE);
+    settingsTextMode();
+    tft_.setTextFont(1);
+    tft_.drawString("GPS", left, 142);
+    button(valueX, 138, 64, 24, settings.gpsLogging ? "Log On" : "Log Off",
+           settings.gpsLogging ? TFT_GREEN : settingsPanel, settings.gpsLogging ? TFT_BLACK : settingsText);
+    button(wideX, 138, wideW, 24, "Cal", settingsAccent, TFT_WHITE);
 
-  tft_.drawString("Airports", left, 212);
-  button(valueX, 206, 66, 26, settings.airportOverlay ? "Apt On" : "Apt Off",
-         settings.airportOverlay ? TFT_GREEN : panel(settings), settings.airportOverlay ? TFT_BLACK : fg(settings));
-  button(wideX, 206, wideW, 26, String(settings.airportLabelKm) + "km", accent(settings), TFT_WHITE);
+    settingsTextMode();
+    tft_.setTextFont(1);
+    tft_.drawString("Apt", left, 168);
+    button(valueX, 164, 64, 24, settings.airportOverlay ? "Apt On" : "Apt Off",
+           settings.airportOverlay ? TFT_GREEN : settingsPanel, settings.airportOverlay ? TFT_BLACK : settingsText);
+    button(wideX, 164, wideW, 24, String(settings.airportLabelKm) + "km", settingsAccent, TFT_WHITE);
 
-  button(8, 252, 106, 28, "Reset WiFi", TFT_RED, TFT_WHITE);
-  button(tft_.width() - 114, 252, 106, 28, "Save", TFT_GREEN, TFT_BLACK);
+    settingsTextMode();
+    tft_.setTextFont(1);
+    tft_.drawString("Center", left, 194);
+    button(valueX, 190, 64, 24, centerLabel, settingsPanel, settingsText);
+    button(wideX, 190, wideW, 24, String(settings.adsbRefreshSec) + "s", settingsAccent, TFT_WHITE);
+
+    button(6, 248, 50, 26, "Reset", TFT_RED, TFT_WHITE);
+    button(61, 248, 50, 26, "WiFi", settingsPanel, settingsText);
+    button(116, 248, 58, 26, "Reboot", settingsPanel, settingsText);
+    button(180, 248, 54, 26, "Save", TFT_GREEN, TFT_BLACK);
+    drawBottomNav(settings, ScreenId::Settings);
+    return;
+  }
+  settingsTextMode();
+  tft_.drawString("Latitude", 16, 48);
+  tft_.drawString(String(settings.homeLat, 5), 110, 48);
+  button(226, 42, 36, 28, "-", settingsPanel, settingsText);
+  button(270, 42, 36, 28, "+", settingsAccent, TFT_WHITE);
+
+  settingsTextMode();
+  tft_.drawString("Longitude", 16, 88);
+  tft_.drawString(String(settings.homeLon, 5), 110, 88);
+  button(226, 82, 36, 28, "-", settingsPanel, settingsText);
+  button(270, 82, 36, 28, "+", settingsAccent, TFT_WHITE);
+
+  settingsTextMode();
+  tft_.drawString("Range", 16, 128);
+  tft_.drawString(String(settings.rangeKm) + " km", 110, 128);
+  button(206, 122, 100, 28, "Change", settingsAccent, TFT_WHITE);
+
+  settingsTextMode();
+  tft_.drawString("Theme", 16, 168);
+  button(110, 162, 86, 28, settings.nightMode ? "Night" : "Day", settingsAccent, TFT_WHITE);
+  button(206, 162, 100, 28, settings.scopeMode ? "Scope" : "Radar", settingsAccent, TFT_WHITE);
+
+  settingsTextMode();
+  tft_.drawString("GPS Log", 16, 208);
+  button(110, 202, 86, 28, settings.gpsLogging ? "Log On" : "Log Off",
+         settings.gpsLogging ? TFT_GREEN : settingsPanel, settings.gpsLogging ? TFT_BLACK : settingsText);
+  button(206, 202, 100, 28, "Cal Touch", settingsAccent, TFT_WHITE);
+
+  settingsTextMode();
+  tft_.drawString("Airports", 16, 248);
+  button(110, 242, 86, 28, settings.airportOverlay ? "Apt On" : "Apt Off",
+         settings.airportOverlay ? TFT_GREEN : settingsPanel, settings.airportOverlay ? TFT_BLACK : settingsText);
+  button(206, 242, 100, 28, String(settings.airportLabelKm) + "km", settingsAccent, TFT_WHITE);
+
+  settingsTextMode();
+  tft_.drawString("Center", 16, 288);
+  button(110, 282, 86, 28, centerLabel, settingsPanel, settingsText);
+  button(206, 282, 100, 28, String(settings.adsbRefreshSec) + " sec", settingsAccent, TFT_WHITE);
+
+  button(10, 334, 72, 30, "Reset", TFT_RED, TFT_WHITE);
+  button(88, 334, 68, 30, "WiFi", settingsPanel, settingsText);
+  button(162, 334, 74, 30, "Reboot", settingsPanel, settingsText);
+  button(242, 334, 68, 30, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
+}
+
+void DisplayUI::drawWiFiSettings(const AppSettings &settings, const WiFiManagerExt &wifi, bool force) {
+  if (!dirty_ && !force) return;
+  dirty_ = false;
+  const bool compactScreen = tft_.width() < 300;
+  tft_.fillScreen(bg(settings));
+  header(settings, "WiFi Settings", wifi.statusText());
+
+  const auto &networks = wifi.networks();
+  if (networks.empty()) {
+    tft_.setTextColor(muted(settings), bg(settings));
+    tft_.setTextDatum(MC_DATUM);
+    tft_.drawString("No saved networks", tft_.width() / 2, 96);
+    tft_.setTextDatum(TL_DATUM);
+  }
+
+  const uint8_t rows = min(compactScreen ? (size_t)3 : (size_t)4, networks.size());
+  for (uint8_t row = 0; row < rows; ++row) {
+    const WifiCredential &cred = networks[row];
+    const int16_t y = (compactScreen ? 36 : 42) + row * (compactScreen ? 34 : 40);
+    const bool selected = wifi.selectedIndex() == row;
+    const uint16_t fill = selected ? accent(settings) : panel(settings);
+    const uint16_t primary = selected ? TFT_WHITE : fg(settings);
+    tft_.fillRoundRect(8, y, tft_.width() - 16, compactScreen ? 30 : 34, 5, fill);
+    tft_.setTextColor(primary, fill);
+    tft_.setTextFont(compactScreen ? 1 : 2);
+    String label = String(row + 1) + ". " + cred.ssid;
+    if (label.length() > 22) label = label.substring(0, 22);
+    tft_.drawString(label, 16, y + 3);
+    tft_.setTextColor(selected ? TFT_WHITE : muted(settings), fill);
+    String meta = cred.enabled ? "enabled" : "disabled";
+    if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == cred.ssid) meta += "  connected";
+    tft_.drawString(meta, 34, y + (compactScreen ? 16 : 18));
+  }
+
+  tft_.setTextColor(fg(settings), bg(settings));
+  tft_.setTextFont(compactScreen ? 1 : 2);
+  tft_.drawString("SSID: " + (wifi.currentSsid().length() ? wifi.currentSsid() : String("---")), 12,
+                  compactScreen ? 146 : 210);
+  tft_.drawString("IP: " + wifi.ipText(), 12, compactScreen ? 162 : 232);
+  tft_.drawString("RSSI: " + String(wifi.rssi()) + " dBm", 12, compactScreen ? 178 : 254);
+
+  if (compactScreen) {
+    button(8, 198, 52, 24, "Add", accent(settings), TFT_WHITE);
+    button(64, 198, 58, 24, "Delete", TFT_RED, TFT_WHITE);
+    button(126, 198, 58, 24, "On/Off", panel(settings), fg(settings));
+    button(188, 198, 22, 24, "Up", panel(settings), fg(settings));
+    button(214, 198, 22, 24, "Dn", panel(settings), fg(settings));
+    button(8, 234, 66, 24, "Export", panel(settings), fg(settings));
+    button(82, 234, 66, 24, "Import", panel(settings), fg(settings));
+    button(156, 234, 76, 24, "Reset", TFT_RED, TFT_WHITE);
+    drawBottomNav(settings, ScreenId::WiFiSettings);
+    return;
+  }
+
+  button(10, 282, 70, 28, "Add", accent(settings), TFT_WHITE);
+  button(86, 282, 70, 28, "Delete", TFT_RED, TFT_WHITE);
+  button(162, 282, 70, 28, "On/Off", panel(settings), fg(settings));
+  button(238, 282, 34, 28, "Up", panel(settings), fg(settings));
+  button(276, 282, 34, 28, "Dn", panel(settings), fg(settings));
+
+  button(10, 322, 90, 28, "Export", panel(settings), fg(settings));
+  button(108, 322, 90, 28, "Import", panel(settings), fg(settings));
+  button(206, 322, 104, 28, "Reset WiFi", TFT_RED, TFT_WHITE);
+  drawBottomNav(settings, ScreenId::WiFiSettings);
 }
 
 const Aircraft *DisplayUI::findAircraft(const std::vector<Aircraft> &aircraft, const String &hex) const {
@@ -533,8 +940,10 @@ const Aircraft *DisplayUI::findAircraft(const std::vector<Aircraft> &aircraft, c
 String DisplayUI::hitAircraft(int16_t x, int16_t y, const AppSettings &settings,
                               const std::vector<Aircraft> &aircraft) {
   const int16_t cx = tft_.width() / 2;
-  const int16_t cy = 190;
-  const int16_t radius = min((int16_t)132, (int16_t)((tft_.width() - 42) / 2));
+  const bool compactScreen = tft_.height() < 400;
+  const int16_t cy = compactScreen ? 136 : 190;
+  const int16_t radius = compactScreen ? min((int16_t)86, (int16_t)((tft_.width() - 48) / 2))
+                                       : min((int16_t)132, (int16_t)((tft_.width() - 42) / 2));
   for (const Aircraft &a : aircraft) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
     if (!p.visible) continue;
@@ -543,29 +952,131 @@ String DisplayUI::hitAircraft(int16_t x, int16_t y, const AppSettings &settings,
   return "";
 }
 
-String DisplayUI::hitAirportRow(int16_t x, int16_t y, const std::vector<Airport> &airports) {
-  const uint8_t maxRows = min((size_t)5, airports.size());
-  for (uint8_t row = 0; row < maxRows; ++row) {
-    if (inRect(x, y, 8, 42 + row * 50, tft_.width() - 16, 44)) return AirportManager::displayCode(airports[row]);
+String DisplayUI::hitAirportRow(int16_t x, int16_t y, const AppSettings &settings,
+                                const std::vector<Airport> &airports) {
+  uint8_t row = 0;
+  uint8_t skipped = 0;
+  for (const Airport &airport : airports) {
+    if (airport.distanceKm > settings.rangeKm) continue;
+    if (skipped++ < airportListOffset_) continue;
+    if (row >= 8) break;
+    if (inRect(x, y, 8, 42 + row * 42, tft_.width() - 16, 36)) return AirportManager::displayCode(airport);
+    row++;
   }
   return "";
 }
 
+uint8_t DisplayUI::airportInRangeCount(const AppSettings &settings, const std::vector<Airport> &airports) const {
+  uint8_t count = 0;
+  for (const Airport &airport : airports) {
+    if (airport.distanceKm <= settings.rangeKm && count < UINT8_MAX) count++;
+  }
+  return count;
+}
+
+int DisplayUI::hitWifiRow(int16_t x, int16_t y, const WiFiManagerExt &wifi) {
+  const bool compactScreen = tft_.width() < 300;
+  const uint8_t rows = min(compactScreen ? (size_t)3 : (size_t)4, wifi.networks().size());
+  for (uint8_t row = 0; row < rows; ++row) {
+    if (inRect(x, y, 8, (compactScreen ? 36 : 42) + row * (compactScreen ? 34 : 40), tft_.width() - 16,
+               compactScreen ? 30 : 34)) {
+      return row;
+    }
+  }
+  return -1;
+}
+
 UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
                                const std::vector<Aircraft> &aircraft, const std::vector<Airport> &airports) {
+  static WiFiManagerExt emptyWifi;
+  return handleTouch(point, screen, settings, aircraft, airports, emptyWifi);
+}
+
+UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const AppSettings &settings,
+                               const std::vector<Aircraft> &aircraft, const std::vector<Airport> &airports,
+                               const WiFiManagerExt &wifi) {
   UIEvent event;
   if (!point.touched) return event;
 
+  if (screen == ScreenId::AircraftList) {
+    auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, aircraft.size());
+    const bool compactScreen = tft_.height() < 400;
+    const uint8_t maxRows = compactScreen ? 3 : 5;
+    const int16_t scrollY = tft_.height() - 106;
+    if (order.size() <= maxRows) aircraftListOffset_ = 0;
+    else if (aircraftListOffset_ > order.size() - maxRows) aircraftListOffset_ = order.size() - maxRows;
+    if (order.size() > maxRows && inRect(point.x, point.y, 4, scrollY, 100, 48)) {
+      if (aircraftListOffset_ > 0) {
+        aircraftListOffset_--;
+        dirty_ = true;
+        Serial.printf("[ui] aircraft list scroll up offset=%u\n", aircraftListOffset_);
+      } else {
+        Serial.println("[ui] aircraft list already at top");
+      }
+      return event;
+    }
+    if (order.size() > maxRows && inRect(point.x, point.y, tft_.width() - 104, scrollY, 100, 48)) {
+      if (aircraftListOffset_ + maxRows < order.size()) {
+        aircraftListOffset_++;
+        dirty_ = true;
+        Serial.printf("[ui] aircraft list scroll down offset=%u\n", aircraftListOffset_);
+      } else {
+        Serial.println("[ui] aircraft list already at bottom");
+      }
+      return event;
+    }
+  }
+
+  if (screen == ScreenId::AirportList) {
+    const bool compactScreen = tft_.height() < 400;
+    const uint8_t maxRows = compactScreen ? 5 : 8;
+    const int16_t scrollY = tft_.height() - 106;
+    const uint8_t inRangeCount = airportInRangeCount(settings, airports);
+    if (inRangeCount > maxRows && inRect(point.x, point.y, 4, scrollY, 100, 48)) {
+      if (airportListOffset_ > 0) {
+        airportListOffset_--;
+        dirty_ = true;
+        Serial.printf("[ui] airport list scroll up offset=%u\n", airportListOffset_);
+      } else {
+        Serial.println("[ui] airport list already at top");
+      }
+      return event;
+    }
+    if (inRangeCount > maxRows && inRect(point.x, point.y, tft_.width() - 104, scrollY, 100, 48)) {
+      if (airportListOffset_ + maxRows < inRangeCount) {
+        airportListOffset_++;
+        dirty_ = true;
+        Serial.printf("[ui] airport list scroll down offset=%u\n", airportListOffset_);
+      } else {
+        Serial.println("[ui] airport list already at bottom");
+      }
+      return event;
+    }
+  }
+
   const int16_t navY = tft_.height() - 38;
-  const int16_t gap = 4;
-  const int16_t navW = (tft_.width() - gap * 6) / 5;
-  if (inRect(point.x, point.y, gap, navY + 5, navW, 28)) event.action = UIAction::ShowRadar;
-  else if (inRect(point.x, point.y, gap * 2 + navW, navY + 5, navW, 28)) event.action = UIAction::ShowList;
-  else if (inRect(point.x, point.y, gap * 3 + navW * 2, navY + 5, navW, 28)) event.action = UIAction::ShowAirportList;
-  else if (inRect(point.x, point.y, gap * 4 + navW * 3, navY + 5, navW, 28)) event.action = UIAction::RangeNext;
-  else if (inRect(point.x, point.y, gap * 5 + navW * 4, navY + 5, navW, 28)) event.action = UIAction::ShowSettings;
+  if (point.y >= navY - 22) {
+    const int16_t gap = 4;
+    const int16_t buttonW = (tft_.width() - gap * 6) / 5;
+    const int16_t radarEnd = gap + buttonW + gap / 2;
+    const int16_t acEnd = gap * 2 + buttonW * 2 + gap / 2;
+    const int16_t aptEnd = gap * 3 + buttonW * 3 + gap / 2;
+    const int16_t rangeEnd = gap * 4 + buttonW * 4 + gap / 2;
+    if (point.x < radarEnd) {
+      event.action = UIAction::ShowRadar;
+    } else if (point.x < acEnd) {
+      event.action = UIAction::ShowList;
+    } else if (point.x < aptEnd) {
+      event.action = UIAction::ShowAirportList;
+    } else if (point.x < rangeEnd) {
+      event.action = UIAction::RangeNext;
+    } else {
+      event.action = UIAction::ShowSettings;
+    }
+  }
 
   if (event.action != UIAction::None) {
+    Serial.printf("[ui] bottom nav x=%d y=%d action=%s\n", point.x, point.y, uiActionName(event.action));
     dirty_ = true;
     return event;
   }
@@ -578,10 +1089,14 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       dirty_ = true;
     }
   } else if (screen == ScreenId::AircraftList) {
-    auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, 6);
-    for (uint8_t row = 0; row < order.size(); ++row) {
-      if (inRect(point.x, point.y, 8, 42 + row * 50, tft_.width() - 16, 44)) {
-        event.aircraftHex = aircraft[order[row]].hex;
+    auto order = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, aircraft.size());
+    const bool compactScreen = tft_.height() < 400;
+    const uint8_t maxRows = min(compactScreen ? (size_t)3 : (size_t)5, order.size());
+    if (order.size() <= maxRows) aircraftListOffset_ = 0;
+    else if (aircraftListOffset_ > order.size() - maxRows) aircraftListOffset_ = order.size() - maxRows;
+    for (uint8_t row = 0; row < maxRows; ++row) {
+      if (inRect(point.x, point.y, 8, (compactScreen ? 104 : 118) + row * 48, tft_.width() - 16, 44)) {
+        event.aircraftHex = aircraft[order[aircraftListOffset_ + row]].hex;
         selectedHex_ = event.aircraftHex;
         event.action = UIAction::ShowDetail;
         dirty_ = true;
@@ -589,31 +1104,99 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
       }
     }
   } else if (screen == ScreenId::AirportList) {
-    event.airportCode = hitAirportRow(point.x, point.y, airports);
+    event.airportCode = hitAirportRow(point.x, point.y, settings, airports);
     if (event.airportCode.length()) {
       selectedAirportCode_ = event.airportCode;
       event.action = UIAction::ShowAirportDetail;
       dirty_ = true;
     }
+  } else if (screen == ScreenId::AirportDetail) {
+    if (inRect(point.x, point.y, 24, 112, tft_.width() - 48, 30) ||
+        inRect(point.x, point.y, 0, 34, tft_.width(), 70)) {
+      event.airportCode = selectedAirportCode_;
+      event.action = UIAction::CenterOnAirport;
+      dirty_ = true;
+    }
+  } else if (screen == ScreenId::WiFiSettings) {
+    int row = hitWifiRow(point.x, point.y, wifi);
+    if (row >= 0) {
+      event.wifiIndex = row;
+      event.action = UIAction::SelectWifiNetwork;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 8, 198, 52, 24, 4)) {
+      event.action = UIAction::WifiAddPortal;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 64, 198, 58, 24, 4)) {
+      event.action = UIAction::WifiDelete;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 126, 198, 58, 24, 4)) {
+      event.action = UIAction::WifiToggle;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 188, 198, 22, 24, 4)) {
+      event.action = UIAction::WifiMoveUp;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 214, 198, 22, 24, 4)) {
+      event.action = UIAction::WifiMoveDown;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 8, 234, 66, 24, 4)) {
+      event.action = UIAction::WifiExport;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 82, 234, 66, 24, 4)) {
+      event.action = UIAction::WifiImport;
+    } else if (tft_.width() < 300 && inTouchRect(point.x, point.y, 156, 234, 76, 24, 4)) {
+      event.action = UIAction::ResetWiFiHold;
+    } else if (inTouchRect(point.x, point.y, 10, 282, 70, 28, 5)) {
+      event.action = UIAction::WifiAddPortal;
+    } else if (inTouchRect(point.x, point.y, 86, 282, 70, 28, 5)) {
+      event.action = UIAction::WifiDelete;
+    } else if (inTouchRect(point.x, point.y, 162, 282, 70, 28, 5)) {
+      event.action = UIAction::WifiToggle;
+    } else if (inRect(point.x, point.y, 234, 276, 40, 40)) {
+      event.action = UIAction::WifiMoveUp;
+    } else if (inRect(point.x, point.y, 274, 276, 42, 40)) {
+      event.action = UIAction::WifiMoveDown;
+    } else if (inTouchRect(point.x, point.y, 10, 322, 90, 28, 6)) {
+      event.action = UIAction::WifiExport;
+    } else if (inTouchRect(point.x, point.y, 108, 322, 90, 28, 6)) {
+      event.action = UIAction::WifiImport;
+    } else if (inTouchRect(point.x, point.y, 206, 322, 104, 28, 6)) {
+      event.action = UIAction::ResetWiFiHold;
+    }
+    if (event.action != UIAction::None) dirty_ = true;
   } else if (screen == ScreenId::Settings) {
-    const int16_t valueX = 82;
-    const int16_t minusX = tft_.width() - 78;
-    const int16_t plusX = tft_.width() - 40;
-    const int16_t wideX = tft_.width() - 88;
-    const int16_t wideW = 80;
-    if (inRect(point.x, point.y, minusX, 36, 32, 26)) event.action = UIAction::LatMinus;
-    else if (inRect(point.x, point.y, plusX, 36, 32, 26)) event.action = UIAction::LatPlus;
-    else if (inRect(point.x, point.y, minusX, 70, 32, 26)) event.action = UIAction::LonMinus;
-    else if (inRect(point.x, point.y, plusX, 70, 32, 26)) event.action = UIAction::LonPlus;
-    else if (inRect(point.x, point.y, wideX, 104, wideW, 26)) event.action = UIAction::RangeNext;
-    else if (inRect(point.x, point.y, valueX, 138, 66, 26)) event.action = UIAction::ToggleTheme;
-    else if (inRect(point.x, point.y, wideX, 138, wideW, 26)) event.action = UIAction::ToggleRadarMode;
-    else if (inRect(point.x, point.y, valueX, 172, 66, 26)) event.action = UIAction::ToggleGpsLogging;
-    else if (inRect(point.x, point.y, wideX, 172, wideW, 26)) event.action = UIAction::StartTouchCalibration;
-    else if (inRect(point.x, point.y, valueX, 206, 66, 26)) event.action = UIAction::ToggleAirportOverlay;
-    else if (inRect(point.x, point.y, wideX, 206, wideW, 26)) event.action = UIAction::AirportLabelNext;
-    else if (inRect(point.x, point.y, 8, 252, 106, 28)) event.action = UIAction::ResetWiFiHold;
-    else if (inRect(point.x, point.y, tft_.width() - 114, 252, 106, 28)) event.action = UIAction::SaveSettings;
+    if (tft_.width() < 300) {
+      const int16_t valueX = 62;
+      const int16_t minusX = tft_.width() - 78;
+      const int16_t plusX = tft_.width() - 40;
+      const int16_t wideX = tft_.width() - 84;
+      const int16_t wideW = 78;
+      if (inTouchRect(point.x, point.y, minusX, 34, 32, 24, 4)) event.action = UIAction::LatMinus;
+      else if (inTouchRect(point.x, point.y, plusX, 34, 32, 24, 4)) event.action = UIAction::LatPlus;
+      else if (inTouchRect(point.x, point.y, minusX, 60, 32, 24, 4)) event.action = UIAction::LonMinus;
+      else if (inTouchRect(point.x, point.y, plusX, 60, 32, 24, 4)) event.action = UIAction::LonPlus;
+      else if (inTouchRect(point.x, point.y, wideX, 86, wideW, 24, 5)) event.action = UIAction::RangeNext;
+      else if (inTouchRect(point.x, point.y, valueX, 112, 64, 24, 5)) event.action = UIAction::ToggleTheme;
+      else if (inTouchRect(point.x, point.y, wideX, 112, wideW, 24, 5)) event.action = UIAction::ToggleRadarMode;
+      else if (inTouchRect(point.x, point.y, valueX, 138, 64, 24, 5)) event.action = UIAction::ToggleGpsLogging;
+      else if (inTouchRect(point.x, point.y, wideX, 138, wideW, 24, 5)) event.action = UIAction::StartTouchCalibration;
+      else if (inTouchRect(point.x, point.y, valueX, 164, 64, 24, 5)) event.action = UIAction::ToggleAirportOverlay;
+      else if (inTouchRect(point.x, point.y, wideX, 164, wideW, 24, 5)) event.action = UIAction::AirportLabelNext;
+      else if (inTouchRect(point.x, point.y, valueX, 190, 64, 24, 5)) event.action = UIAction::CenterModeNext;
+      else if (inTouchRect(point.x, point.y, wideX, 190, wideW, 24, 5)) event.action = UIAction::RefreshRateNext;
+      else if (inTouchRect(point.x, point.y, 6, 248, 50, 26, 4)) event.action = UIAction::ResetWiFiHold;
+      else if (inTouchRect(point.x, point.y, 61, 248, 50, 26, 4)) event.action = UIAction::ShowWiFiSettings;
+      else if (inTouchRect(point.x, point.y, 116, 248, 58, 26, 4)) event.action = UIAction::RebootDevice;
+      else if (inTouchRect(point.x, point.y, 180, 248, 54, 26, 4)) event.action = UIAction::SaveSettings;
+    } else if (inTouchRect(point.x, point.y, 226, 42, 36, 28, 5)) event.action = UIAction::LatMinus;
+    else if (inTouchRect(point.x, point.y, 270, 42, 36, 28, 5)) event.action = UIAction::LatPlus;
+    else if (inTouchRect(point.x, point.y, 226, 82, 36, 28, 5)) event.action = UIAction::LonMinus;
+    else if (inTouchRect(point.x, point.y, 270, 82, 36, 28, 5)) event.action = UIAction::LonPlus;
+    else if (inTouchRect(point.x, point.y, 206, 122, 100, 28, 8)) event.action = UIAction::RangeNext;
+    else if (inTouchRect(point.x, point.y, 110, 162, 86, 28)) event.action = UIAction::ToggleTheme;
+    else if (inTouchRect(point.x, point.y, 206, 162, 100, 28)) event.action = UIAction::ToggleRadarMode;
+    else if (inTouchRect(point.x, point.y, 110, 202, 86, 28)) event.action = UIAction::ToggleGpsLogging;
+    else if (inTouchRect(point.x, point.y, 206, 202, 100, 28)) event.action = UIAction::StartTouchCalibration;
+    else if (inTouchRect(point.x, point.y, 110, 242, 86, 28)) event.action = UIAction::ToggleAirportOverlay;
+    else if (inTouchRect(point.x, point.y, 206, 242, 100, 28)) event.action = UIAction::AirportLabelNext;
+    else if (inTouchRect(point.x, point.y, 110, 282, 86, 28)) event.action = UIAction::CenterModeNext;
+    else if (inTouchRect(point.x, point.y, 206, 282, 100, 28)) event.action = UIAction::RefreshRateNext;
+    else if (inTouchRect(point.x, point.y, 10, 334, 72, 30, 6)) event.action = UIAction::ResetWiFiHold;
+    else if (inTouchRect(point.x, point.y, 88, 334, 68, 30, 6)) event.action = UIAction::ShowWiFiSettings;
+    else if (inTouchRect(point.x, point.y, 162, 334, 74, 30, 6)) event.action = UIAction::RebootDevice;
+    else if (inTouchRect(point.x, point.y, 242, 334, 68, 30, 6)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }
   return event;

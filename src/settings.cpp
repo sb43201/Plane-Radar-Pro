@@ -8,6 +8,10 @@ AppSettings SettingsStore::load() {
   AppSettings s;
   s.homeLat = prefs_.getFloat("homeLat", Config::DEFAULT_HOME_LAT);
   s.homeLon = prefs_.getFloat("homeLon", Config::DEFAULT_HOME_LON);
+  s.centerMode = prefs_.getUChar("ctrMode", CENTER_MANUAL);
+  s.airportCenterLat = prefs_.getFloat("aptCtrLat", NAN);
+  s.airportCenterLon = prefs_.getFloat("aptCtrLon", NAN);
+  s.airportCenterCode = prefs_.getString("aptCtrCode", "");
   s.rangeKm = prefs_.getUShort("rangeKm", Config::DEFAULT_RANGE_KM);
   s.nightMode = prefs_.getBool("night", false);
   s.displayRotation = prefs_.getUChar("rotationP", Config::DEFAULT_ROTATION);
@@ -15,10 +19,12 @@ AppSettings SettingsStore::load() {
   s.touchMaxX = prefs_.getInt("tMaxX", Config::TOUCH_MAX_X);
   s.touchMinY = prefs_.getInt("tMinY", Config::TOUCH_MIN_Y);
   s.touchMaxY = prefs_.getInt("tMaxY", Config::TOUCH_MAX_Y);
+  s.touchCalibrated = prefs_.getBool("touchCal", false);
   s.gpsLogging = prefs_.getBool("gpsLog", false);
   s.scopeMode = prefs_.getBool("scope", true);
   s.airportOverlay = prefs_.getBool("aptOv", true);
   s.airportLabelKm = prefs_.getUShort("aptLbl", 50);
+  s.adsbRefreshSec = prefs_.getUShort("adsbSec", 5);
 
   bool rangeOk = false;
   for (size_t i = 0; i < Config::RANGE_OPTION_COUNT; ++i) {
@@ -36,6 +42,20 @@ AppSettings SettingsStore::load() {
     }
   }
   if (!labelOk) s.airportLabelKm = 50;
+  bool refreshOk = false;
+  for (size_t i = 0; i < Config::ADSB_REFRESH_OPTION_COUNT; ++i) {
+    if (s.adsbRefreshSec == Config::ADSB_REFRESH_OPTIONS_SEC[i]) {
+      refreshOk = true;
+      break;
+    }
+  }
+  if (!refreshOk) s.adsbRefreshSec = 5;
+  if (s.centerMode > CENTER_AIRPORT) s.centerMode = CENTER_MANUAL;
+  if (s.centerMode == CENTER_AIRPORT &&
+      (isnan(s.airportCenterLat) || isnan(s.airportCenterLon) || s.airportCenterLat < -90.0f ||
+       s.airportCenterLat > 90.0f || s.airportCenterLon < -180.0f || s.airportCenterLon > 180.0f)) {
+    s.centerMode = CENTER_MANUAL;
+  }
   if (s.displayRotation > 3) s.displayRotation = Config::DEFAULT_ROTATION;
   return s;
 }
@@ -43,6 +63,10 @@ AppSettings SettingsStore::load() {
 void SettingsStore::save(const AppSettings &s) {
   prefs_.putFloat("homeLat", s.homeLat);
   prefs_.putFloat("homeLon", s.homeLon);
+  prefs_.putUChar("ctrMode", s.centerMode);
+  prefs_.putFloat("aptCtrLat", s.airportCenterLat);
+  prefs_.putFloat("aptCtrLon", s.airportCenterLon);
+  prefs_.putString("aptCtrCode", s.airportCenterCode);
   prefs_.putUShort("rangeKm", s.rangeKm);
   prefs_.putBool("night", s.nightMode);
   prefs_.putUChar("rotationP", s.displayRotation);
@@ -50,10 +74,12 @@ void SettingsStore::save(const AppSettings &s) {
   prefs_.putInt("tMaxX", s.touchMaxX);
   prefs_.putInt("tMinY", s.touchMinY);
   prefs_.putInt("tMaxY", s.touchMaxY);
+  prefs_.putBool("touchCal", s.touchCalibrated);
   prefs_.putBool("gpsLog", s.gpsLogging);
   prefs_.putBool("scope", s.scopeMode);
   prefs_.putBool("aptOv", s.airportOverlay);
   prefs_.putUShort("aptLbl", s.airportLabelKm);
+  prefs_.putUShort("adsbSec", s.adsbRefreshSec);
 }
 
 void SettingsStore::reset() {

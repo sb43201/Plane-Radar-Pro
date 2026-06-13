@@ -3,6 +3,9 @@
 #include <SPIFFS.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
+#include <ctype.h>
+#include <math.h>
+#include <stdlib.h>
 #include <time.h>
 #include <vector>
 
@@ -14,6 +17,7 @@
 #include "radar.h"
 #include "settings.h"
 #include "touch.h"
+#include "wifi_manager_ext.h"
 
 SettingsStore settingsStore;
 AppSettings settings;
@@ -22,6 +26,7 @@ TouchInput touch;
 ADSBClient adsb;
 GPSModule gps;
 AirportManager airportManager;
+WiFiManagerExt wifiExt;
 std::vector<Aircraft> aircraft;
 
 ScreenId currentScreen = ScreenId::Radar;
@@ -31,7 +36,6 @@ String wifiStatus = "boot";
 String lastUpdateText = "No update";
 uint32_t lastAdsbMs = 0;
 uint32_t lastReconnectMs = 0;
-uint32_t lastClockMs = 0;
 uint32_t lastBatteryMs = 0;
 uint32_t lastGpsLogMs = 0;
 bool timeConfigured = false;
@@ -42,14 +46,47 @@ uint32_t resetWiFiLastTouchMs = 0;
 String gpsStatus = "No GPS";
 String gpsCompassStatus = "";
 String batteryStatus = "Bat --";
+float lastBatteryVolts = NAN;
 String alertStatus = "";
 RawTouchPoint calibrationPoints[4];
 uint8_t calibrationStep = 0;
 bool calibrationWaitingForRelease = false;
+float lastGpsCenterLat = NAN;
+float lastGpsCenterLon = NAN;
+bool startupCalibrationMode = false;
 
 void updateAircraftAlerts();
 void processGpsLogging();
 void updateAirports(bool force = false);
+void continueStartupAfterCalibration();
+void startTouchCalibration(bool startupMode);
+
+float activeRadarLat() {
+  if (settings.centerMode == CENTER_GPS && gps.hasFix()) return gps.latitude();
+  if (settings.centerMode == CENTER_AIRPORT && !isnan(settings.airportCenterLat)) return settings.airportCenterLat;
+  return settings.homeLat;
+}
+
+float activeRadarLon() {
+  if (settings.centerMode == CENTER_GPS && gps.hasFix()) return gps.longitude();
+  if (settings.centerMode == CENTER_AIRPORT && !isnan(settings.airportCenterLon)) return settings.airportCenterLon;
+  return settings.homeLon;
+}
+
+AppSettings activeRadarSettings() {
+  AppSettings active = settings;
+  active.homeLat = activeRadarLat();
+  active.homeLon = activeRadarLon();
+  return active;
+}
+
+String connectedWifiLabel() {
+  String ssid = WiFi.SSID();
+  ssid.trim();
+  if (ssid.isEmpty()) return "Connected";
+  if (ssid.length() > 14) ssid = ssid.substring(0, 14);
+  return ssid;
+}
 
 void markWifiPortalSaved() {
   wifiPortalSaved = true;
@@ -90,6 +127,36 @@ String compassPoint(float deg) {
   return POINTS[index];
 }
 
+const char *screenName(ScreenId screen) {
+  switch (screen) {
+    case ScreenId::Radar:
+      return "Radar";
+    case ScreenId::AircraftList:
+      return "AircraftList";
+    case ScreenId::AirportList:
+      return "AirportList";
+    case ScreenId::Detail:
+      return "AircraftDetail";
+    case ScreenId::AirportDetail:
+      return "AirportDetail";
+    case ScreenId::Settings:
+      return "Settings";
+    case ScreenId::WiFiSettings:
+      return "WiFiSettings";
+    case ScreenId::TouchCalibration:
+      return "TouchCalibration";
+  }
+  return "Unknown";
+}
+
+bool allowBackgroundRedraw() {
+  return currentScreen == ScreenId::Radar || currentScreen == ScreenId::AircraftList || currentScreen == ScreenId::Detail;
+}
+
+void invalidateForBackgroundUpdate() {
+  if (allowBackgroundRedraw()) display.invalidate();
+}
+
 void configureTimeIfNeeded() {
   if (timeConfigured || WiFi.status() != WL_CONNECTED) return;
   configTzTime("EST5EDT,M3.2.0,M11.1.0", "pool.ntp.org", "time.nist.gov");
@@ -109,10 +176,12 @@ void updateBatteryStatus(bool force = false) {
   millivolts /= Config::BATTERY_ADC_SAMPLES;
 
   const float batteryVolts = (millivolts / 1000.0f) * Config::BATTERY_ADC_DIVIDER;
-  String newStatus = "Bat " + String(batteryVolts, 2) + "V";
-  if (newStatus != batteryStatus) {
+  String newStatus = "Bat " + String(batteryVolts, 1) + "V";
+  const bool meaningfulChange = isnan(lastBatteryVolts) || fabsf(batteryVolts - lastBatteryVolts) >= 0.08f;
+  if (force || (newStatus != batteryStatus && meaningfulChange)) {
+    lastBatteryVolts = batteryVolts;
     batteryStatus = newStatus;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     Serial.printf("[battery] adc=%lu mV battery=%.2f V\n", millivolts, batteryVolts);
   }
 }
@@ -195,45 +264,116 @@ void processGpsLogging() {
   appendGpsLogLine();
 }
 
+bool parsePortalFloat(const char *text, float &value) {
+  if (!text) return false;
+  while (isspace((unsigned char)*text)) text++;
+  if (*text == '\0') return false;
+
+  char *end = nullptr;
+  const float parsed = strtof(text, &end);
+  if (end == text || isnan(parsed)) return false;
+  while (end && isspace((unsigned char)*end)) end++;
+  if (end && *end != '\0') return false;
+
+  value = parsed;
+  return true;
+}
+
+String centerModeText() {
+  if (settings.centerMode == CENTER_GPS) return "GPS";
+  if (settings.centerMode == CENTER_AIRPORT) {
+    return settings.airportCenterCode.length() ? "APT " + settings.airportCenterCode : "APT";
+  }
+  return "Manual";
+}
+
+void applyPortalCenterSettings(const char *airportText, const char *latText, const char *lonText) {
+  String airportCode = airportText ? String(airportText) : String("");
+  airportCode.trim();
+  if (airportCode.length()) {
+    Airport airport;
+    if (airportManager.findInDatabaseByCode(airportCode, airport)) {
+      settings.centerMode = CENTER_AIRPORT;
+      settings.airportCenterLat = airport.lat;
+      settings.airportCenterLon = airport.lon;
+      settings.airportCenterCode = AirportManager::displayCode(airport);
+      settingsStore.save(settings);
+      lastAdsbMs = 0;
+      updateAirports(true);
+      Serial.printf("[wifi] portal center airport saved %s lat=%.6f lon=%.6f\n",
+                    settings.airportCenterCode.c_str(), settings.airportCenterLat, settings.airportCenterLon);
+      return;
+    }
+    Serial.printf("[wifi] portal center airport not found: %s\n", airportCode.c_str());
+  }
+
+  float lat = NAN;
+  float lon = NAN;
+  if (!parsePortalFloat(latText, lat) || !parsePortalFloat(lonText, lon)) {
+    Serial.println("[wifi] portal home location unchanged");
+    return;
+  }
+  if (lat < -90.0f || lat > 90.0f || lon < -180.0f || lon > 180.0f) {
+    Serial.printf("[wifi] portal home location rejected lat=%.6f lon=%.6f\n", lat, lon);
+    return;
+  }
+
+  settings.centerMode = CENTER_MANUAL;
+  settings.homeLat = lat;
+  settings.homeLon = lon;
+  settingsStore.save(settings);
+  lastAdsbMs = 0;
+  updateAirports(true);
+  Serial.printf("[wifi] portal home location saved lat=%.6f lon=%.6f\n", settings.homeLat, settings.homeLon);
+}
+
 void startWiFi() {
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   wm.setDebugOutput(true);
-  wm.setConnectTimeout(60);
-  wm.setConnectRetries(3);
+  wm.setConnectTimeout(30);
+  wm.setConnectRetries(2);
+  wm.setBreakAfterConfig(true);
   wm.setSaveConfigCallback(markWifiPortalSaved);
+  char portalAirport[12] = "";
+  char portalLat[18] = "";
+  char portalLon[18] = "";
+  WiFiManagerParameter centerAirportParam("center_airport", "Center airport code", portalAirport,
+                                          sizeof(portalAirport) - 1);
+  WiFiManagerParameter homeLatParam("home_lat", "Home latitude", portalLat, sizeof(portalLat) - 1);
+  WiFiManagerParameter homeLonParam("home_lon", "Home longitude", portalLon, sizeof(portalLon) - 1);
+  wm.addParameter(&centerAirportParam);
+  wm.addParameter(&homeLatParam);
+  wm.addParameter(&homeLonParam);
 
   const String savedSsid = wm.getWiFiSSID(true);
-  if (savedSsid.length()) {
-    wifiStatus = "Searching";
-    Serial.printf("[wifi] trying saved hotspot: %s\n", savedSsid.c_str());
-    display.drawWiFiSetup(settings, savedSsid, "WiFi: Searching");
-    WiFi.begin();
-    const uint32_t startMs = millis();
-    uint32_t lastDrawMs = 0;
-    while (WiFi.status() != WL_CONNECTED && millis() - startMs < Config::WIFI_CONNECT_TIMEOUT_MS) {
-      if (millis() - lastDrawMs >= 1000) {
-        lastDrawMs = millis();
-        display.drawWiFiSetup(settings, savedSsid, "Trying saved hotspot");
-        Serial.printf("[wifi] connecting to %s, status=%d\n", savedSsid.c_str(), WiFi.status());
-      }
-      delay(50);
-    }
-    if (WiFi.status() == WL_CONNECTED) {
-      wifiStatus = "Connected";
-      Serial.printf("[wifi] connected ip=%s\n", WiFi.localIP().toString().c_str());
-      configureTimeIfNeeded();
-      return;
-    }
+  const String savedPass = wm.getWiFiPass(true);
+  if (wifiExt.networks().empty() && savedSsid.length()) {
+    wifiExt.addOrUpdate(savedSsid, savedPass, true);
+  }
+
+  wifiStatus = "Searching";
+  display.drawWiFiSetup(settings, savedSsid, "WiFi: Searching");
+  if (wifiExt.connectSaved(30000, 2)) {
+    wifiStatus = connectedWifiLabel();
+    configureTimeIfNeeded();
+    return;
   }
 
   wifiStatus = "Setup Mode";
   display.drawWiFiSetup(settings, savedSsid, "WiFi: Setup Mode");
   Serial.println("[wifi] starting WiFiManager setup portal");
+  wifiPortalSaved = false;
   bool ok = wm.autoConnect(Config::WIFI_AP_NAME);
-  wifiStatus = ok ? "Connected" : "Searching";
-  Serial.printf("[wifi] %s ip=%s\n", ok ? "connected" : "not connected", WiFi.localIP().toString().c_str());
-  if (ok && wifiPortalSaved) {
+  wifiStatus = ok ? connectedWifiLabel() : "Searching";
+  Serial.printf("[wifi] %s ssid=%s ip=%s\n", ok ? "connected" : "not connected", WiFi.SSID().c_str(),
+                WiFi.localIP().toString().c_str());
+  if (ok || wifiPortalSaved) {
+    const String portalSsid = wm.getWiFiSSID(true);
+    if (portalSsid.length()) wifiExt.addOrUpdate(portalSsid, wm.getWiFiPass(true), true);
+    applyPortalCenterSettings(centerAirportParam.getValue(), homeLatParam.getValue(), homeLonParam.getValue());
+  }
+  if (wifiPortalSaved) {
     Serial.println("[wifi] portal saved credentials; rebooting into radar mode");
     delay(500);
     ESP.restart();
@@ -243,7 +383,11 @@ void startWiFi() {
 
 void maintainWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
-    wifiStatus = "Connected";
+    String newStatus = connectedWifiLabel();
+    if (newStatus != wifiStatus) {
+      wifiStatus = newStatus;
+      invalidateForBackgroundUpdate();
+    }
     configureTimeIfNeeded();
     return;
   }
@@ -251,34 +395,34 @@ void maintainWiFi() {
   wifiStatus = "Searching";
   if (lastUpdateText != "WiFi lost") {
     lastUpdateText = "WiFi lost";
-    display.invalidate();
+    invalidateForBackgroundUpdate();
   }
   const uint32_t now = millis();
   if (now - lastReconnectMs < Config::WIFI_RECONNECT_MS) return;
   lastReconnectMs = now;
-  Serial.println("[wifi] reconnecting");
-  WiFi.reconnect();
+  Serial.println("[wifi] reconnecting through saved network list");
+  wifiExt.processReconnect(30000, 2);
 }
 
 void refreshAdsbIfDue(bool force = false) {
   const uint32_t now = millis();
-  if (!force && now - lastAdsbMs < Config::ADSB_REFRESH_MS) return;
+  if (!force && now - lastAdsbMs < (uint32_t)settings.adsbRefreshSec * 1000UL) return;
   lastAdsbMs = now;
 
   if (WiFi.status() != WL_CONNECTED) {
     lastUpdateText = "WiFi lost";
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     return;
   }
 
-  const bool ok = adsb.fetch(settings.homeLat, settings.homeLon, settings.rangeKm, aircraft);
+  const bool ok = adsb.fetch(activeRadarLat(), activeRadarLon(), settings.rangeKm, aircraft);
   if (ok) {
     lastUpdateText = aircraft.empty() ? "No aircraft" : "Updated " + localTimeText();
     updateAircraftAlerts();
   } else {
     lastUpdateText = adsb.lastError();
   }
-  display.invalidate();
+  invalidateForBackgroundUpdate();
 }
 
 void updateAircraftAlerts() {
@@ -289,7 +433,7 @@ void updateAircraftAlerts() {
 
   for (const Aircraft &a : aircraft) {
     if (!isnan(a.lat) && !isnan(a.lon)) {
-      const float distance = Radar::distanceKm(settings.homeLat, settings.homeLon, a.lat, a.lon);
+      const float distance = Radar::distanceKm(activeRadarLat(), activeRadarLon(), a.lat, a.lon);
       if (distance <= Config::ALERT_DISTANCE_KM && distance < nearestDistance) {
         nearestDistance = distance;
         nearestAlert = aircraftName(a) + " " + String(distance, 1) + " km";
@@ -311,7 +455,7 @@ void updateAircraftAlerts() {
 
   if (newAlert != alertStatus) {
     alertStatus = newAlert;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     if (alertStatus.length()) Serial.printf("[alert] %s\n", alertStatus.c_str());
   }
 }
@@ -321,7 +465,7 @@ void updateGpsPosition() {
   const String newStatus = gps.statusText();
   if (newStatus != gpsStatus) {
     gpsStatus = newStatus;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     Serial.printf("[gps] status=%s\n", gpsStatus.c_str());
   }
 
@@ -332,29 +476,28 @@ void updateGpsPosition() {
   }
   if (newCompass != gpsCompassStatus) {
     gpsCompassStatus = newCompass;
-    display.invalidate();
+    invalidateForBackgroundUpdate();
     if (gpsCompassStatus.length()) Serial.printf("[gps] compass=%s\n", gpsCompassStatus.c_str());
   }
 
-  if (!gps.hasFix()) return;
-
-  const float lat = gps.latitude();
-  const float lon = gps.longitude();
-  if (isnan(lat) || isnan(lon)) return;
-
-  if (fabs(settings.homeLat - lat) > 0.00005f || fabs(settings.homeLon - lon) > 0.00005f) {
-    settings.homeLat = lat;
-    settings.homeLon = lon;
+  if (settings.centerMode == CENTER_GPS && gps.hasFix()) {
+    const float lat = gps.latitude();
+    const float lon = gps.longitude();
+    const bool moved = isnan(lastGpsCenterLat) || isnan(lastGpsCenterLon) ||
+                       Radar::distanceKm(lastGpsCenterLat, lastGpsCenterLon, lat, lon) >=
+                           Config::AIRPORT_RELOAD_MOVE_KM;
+    if (!moved) return;
+    lastGpsCenterLat = lat;
+    lastGpsCenterLon = lon;
     lastAdsbMs = 0;
     updateAirports(true);
-    display.invalidate();
-    Serial.printf("[gps] using GPS home position %.6f, %.6f\n", settings.homeLat, settings.homeLon);
+    Serial.printf("[gps] radar centered from live GPS %.6f, %.6f\n", lat, lon);
   }
 }
 
 void updateAirports(bool force) {
-  if (airportManager.refreshIfDue(settings.homeLat, settings.homeLon, force)) {
-    display.invalidate();
+  if (airportManager.refreshIfDue(activeRadarLat(), activeRadarLon(), force)) {
+    invalidateForBackgroundUpdate();
   }
 }
 
@@ -372,7 +515,43 @@ void cycleRange() {
   Serial.printf("[settings] range=%u km\n", settings.rangeKm);
 }
 
+void startAddNetworkPortal() {
+  wifiStatus = "Setup Mode";
+  display.drawWiFiSetup(settings, "", "Add WiFi Network");
+  WiFiManager wm;
+  wm.setDebugOutput(true);
+  wm.setConnectTimeout(30);
+  wm.setConnectRetries(2);
+  wm.setBreakAfterConfig(true);
+  wm.setSaveConfigCallback(markWifiPortalSaved);
+  char portalAirport[12] = "";
+  char portalLat[18] = "";
+  char portalLon[18] = "";
+  WiFiManagerParameter centerAirportParam("center_airport", "Center airport code", portalAirport,
+                                          sizeof(portalAirport) - 1);
+  WiFiManagerParameter homeLatParam("home_lat", "Home latitude", portalLat, sizeof(portalLat) - 1);
+  WiFiManagerParameter homeLonParam("home_lon", "Home longitude", portalLon, sizeof(portalLon) - 1);
+  wm.addParameter(&centerAirportParam);
+  wm.addParameter(&homeLatParam);
+  wm.addParameter(&homeLonParam);
+  Serial.println("[wifi] starting add-network portal");
+  wifiPortalSaved = false;
+  bool ok = wm.startConfigPortal(Config::WIFI_AP_NAME);
+  if (ok || wifiPortalSaved) {
+    const String portalSsid = wm.getWiFiSSID(true);
+    if (portalSsid.length()) wifiExt.addOrUpdate(portalSsid, wm.getWiFiPass(true), true);
+    applyPortalCenterSettings(centerAirportParam.getValue(), homeLatParam.getValue(), homeLonParam.getValue());
+    wifiStatus = WiFi.status() == WL_CONNECTED ? connectedWifiLabel() : "Searching";
+    Serial.printf("[wifi] added portal network ssid=%s\n", wm.getWiFiSSID(true).c_str());
+  } else {
+    wifiStatus = WiFi.status() == WL_CONNECTED ? connectedWifiLabel() : "Searching";
+    Serial.println("[wifi] add-network portal closed without connection");
+  }
+  display.invalidate();
+}
+
 void handleUiEvent(const UIEvent &event) {
+  const ScreenId previousScreen = currentScreen;
   switch (event.action) {
     case UIAction::None:
       return;
@@ -388,6 +567,9 @@ void handleUiEvent(const UIEvent &event) {
     case UIAction::ShowSettings:
       currentScreen = ScreenId::Settings;
       break;
+    case UIAction::ShowWiFiSettings:
+      currentScreen = ScreenId::WiFiSettings;
+      break;
     case UIAction::ShowDetail:
       selectedHex = event.aircraftHex;
       currentScreen = ScreenId::Detail;
@@ -396,12 +578,27 @@ void handleUiEvent(const UIEvent &event) {
       selectedAirportCode = event.airportCode;
       currentScreen = ScreenId::AirportDetail;
       break;
+    case UIAction::CenterOnAirport: {
+      if (event.airportCode.length()) selectedAirportCode = event.airportCode;
+      const Airport *airport = selectedAirport();
+      if (airport) {
+        const String airportCode = AirportManager::displayCode(*airport);
+        settings.centerMode = CENTER_AIRPORT;
+        settings.airportCenterLat = airport->lat;
+        settings.airportCenterLon = airport->lon;
+        settings.airportCenterCode = airportCode;
+        settingsStore.save(settings);
+        lastAdsbMs = 0;
+        updateAirports(true);
+        refreshAdsbIfDue(true);
+        currentScreen = ScreenId::Radar;
+        Serial.printf("[airport] radar center mode set to %s %.6f, %.6f\n", airportCode.c_str(),
+                      settings.airportCenterLat, settings.airportCenterLon);
+      }
+      break;
+    }
     case UIAction::StartTouchCalibration:
-      currentScreen = ScreenId::TouchCalibration;
-      calibrationStep = 0;
-      calibrationWaitingForRelease = false;
-      display.drawTouchCalibration(settings, calibrationStep, false);
-      Serial.println("[touch-cal] calibration started");
+      startTouchCalibration(false);
       return;
     case UIAction::RangeNext:
       cycleRange();
@@ -440,27 +637,108 @@ void handleUiEvent(const UIEvent &event) {
       Serial.printf("[settings] airportLabelKm=%u\n", settings.airportLabelKm);
       break;
     }
+    case UIAction::RefreshRateNext: {
+      size_t index = 0;
+      for (size_t i = 0; i < Config::ADSB_REFRESH_OPTION_COUNT; ++i) {
+        if (settings.adsbRefreshSec == Config::ADSB_REFRESH_OPTIONS_SEC[i]) {
+          index = i;
+          break;
+        }
+      }
+      settings.adsbRefreshSec = Config::ADSB_REFRESH_OPTIONS_SEC[(index + 1) % Config::ADSB_REFRESH_OPTION_COUNT];
+      settingsStore.save(settings);
+      Serial.printf("[settings] adsbRefreshSec=%u\n", settings.adsbRefreshSec);
+      break;
+    }
+    case UIAction::CenterModeNext:
+      if (settings.centerMode == CENTER_MANUAL) {
+        settings.centerMode = CENTER_GPS;
+      } else if (settings.centerMode == CENTER_GPS) {
+        settings.centerMode = CENTER_AIRPORT;
+      } else {
+        settings.centerMode = CENTER_MANUAL;
+      }
+      if (settings.centerMode == CENTER_AIRPORT &&
+          (isnan(settings.airportCenterLat) || isnan(settings.airportCenterLon))) {
+        settings.centerMode = CENTER_MANUAL;
+        lastUpdateText = "No airport center";
+      }
+      if (settings.centerMode == CENTER_GPS && !gps.hasFix()) lastUpdateText = "No GPS fix";
+      settingsStore.save(settings);
+      lastAdsbMs = 0;
+      updateAirports(true);
+      refreshAdsbIfDue(true);
+      Serial.printf("[settings] centerMode=%s\n", centerModeText().c_str());
+      break;
     case UIAction::LatPlus:
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLat = constrain(settings.homeLat + 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LatMinus:
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLat = constrain(settings.homeLat - 0.01f, -90.0f, 90.0f);
       break;
     case UIAction::LonPlus:
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLon += 0.01f;
       if (settings.homeLon > 180.0f) settings.homeLon = -180.0f;
       break;
     case UIAction::LonMinus:
+      settings.centerMode = CENTER_MANUAL;
       settings.homeLon -= 0.01f;
       if (settings.homeLon < -180.0f) settings.homeLon = 180.0f;
       break;
     case UIAction::SaveSettings:
+      if (settings.centerMode == CENTER_GPS) {
+        if (gps.hasFix()) {
+          settings.homeLat = gps.latitude();
+          settings.homeLon = gps.longitude();
+          settings.centerMode = CENTER_MANUAL;
+          Serial.printf("[settings] GPS saved as manual home=(%.5f, %.5f)\n", settings.homeLat, settings.homeLon);
+        } else {
+          lastUpdateText = "No GPS fix";
+          Serial.println("[settings] Save GPS requested but no fix is available");
+        }
+      }
       settingsStore.save(settings);
       lastAdsbMs = 0;
       Serial.printf("[settings] saved home=(%.5f, %.5f)\n", settings.homeLat, settings.homeLon);
       break;
+    case UIAction::RebootDevice:
+      Serial.println("[system] reboot requested from settings");
+      delay(150);
+      ESP.restart();
+      break;
+    case UIAction::SelectWifiNetwork:
+      wifiExt.setSelectedIndex(event.wifiIndex);
+      break;
+    case UIAction::WifiAddPortal:
+      startAddNetworkPortal();
+      currentScreen = ScreenId::WiFiSettings;
+      break;
+    case UIAction::WifiDelete:
+      wifiExt.remove(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiMoveUp:
+      wifiExt.moveUp(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiMoveDown:
+      wifiExt.moveDown(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiToggle:
+      wifiExt.toggleEnabled(wifiExt.selectedIndex());
+      break;
+    case UIAction::WifiExport:
+      lastUpdateText = wifiExt.exportToSd() ? "WiFi exported" : "WiFi export failed";
+      break;
+    case UIAction::WifiImport:
+      lastUpdateText = wifiExt.importFromSd() ? "WiFi imported" : "WiFi import failed";
+      break;
     case UIAction::ResetWiFiHold:
       break;
+  }
+  if (previousScreen != currentScreen) {
+    Serial.printf("[ui] screen %s -> %s\n", screenName(previousScreen), screenName(currentScreen));
   }
   display.invalidate();
 }
@@ -473,24 +751,37 @@ void finishTouchCalibration() {
 
   if (abs(rightX - leftX) < 300 || abs(bottomY - topY) < 300) {
     Serial.println("[touch-cal] rejected calibration: points too close");
+    if (startupCalibrationMode) {
+      startTouchCalibration(true);
+      return;
+    }
     currentScreen = ScreenId::Settings;
     display.invalidate();
     return;
   }
 
-  settings.touchMinX = leftX < rightX ? min((int)calibrationPoints[0].x, (int)calibrationPoints[3].x)
-                                      : max((int)calibrationPoints[0].x, (int)calibrationPoints[3].x);
-  settings.touchMaxX = leftX < rightX ? max((int)calibrationPoints[1].x, (int)calibrationPoints[2].x)
-                                      : min((int)calibrationPoints[1].x, (int)calibrationPoints[2].x);
-  settings.touchMinY = topY < bottomY ? min((int)calibrationPoints[0].y, (int)calibrationPoints[1].y)
-                                      : max((int)calibrationPoints[0].y, (int)calibrationPoints[1].y);
-  settings.touchMaxY = topY < bottomY ? max((int)calibrationPoints[2].y, (int)calibrationPoints[3].y)
-                                      : min((int)calibrationPoints[2].y, (int)calibrationPoints[3].y);
+  const float targetLeft = 28.0f;
+  const float targetRight = Config::SCREEN_W - 28.0f;
+  const float targetTop = 60.0f;
+  const float targetBottom = Config::SCREEN_H - 28.0f;
+  const float xScale = (rightX - leftX) / (targetRight - targetLeft);
+  const float yScale = (bottomY - topY) / (targetBottom - targetTop);
+
+  settings.touchMinX = lroundf(leftX - xScale * targetLeft);
+  settings.touchMaxX = lroundf(leftX + xScale * ((Config::SCREEN_W - 1) - targetLeft));
+  settings.touchMinY = lroundf(topY - yScale * targetTop);
+  settings.touchMaxY = lroundf(topY + yScale * ((Config::SCREEN_H - 1) - targetTop));
+  settings.touchCalibrated = true;
   settingsStore.save(settings);
   Serial.printf("[touch-cal] saved x=(%d,%d) y=(%d,%d)\n", settings.touchMinX, settings.touchMaxX,
                 settings.touchMinY, settings.touchMaxY);
   display.drawTouchCalibration(settings, calibrationStep, true);
   delay(900);
+  if (startupCalibrationMode) {
+    startupCalibrationMode = false;
+    continueStartupAfterCalibration();
+    return;
+  }
   currentScreen = ScreenId::Settings;
   display.invalidate();
 }
@@ -524,6 +815,7 @@ void resetWiFiAndRestart() {
   display.drawWiFiSetup(settings, "", "Clearing WiFi");
   WiFiManager wm;
   wm.resetSettings();
+  wifiExt.clear();
   WiFi.disconnect(true, true);
   delay(500);
   ESP.restart();
@@ -550,30 +842,50 @@ void processResetWiFiHold(const UIEvent &event) {
 
 void drawCurrentScreen(bool force = false) {
   const String timeText = localTimeText();
+  AppSettings radarSettings = activeRadarSettings();
   switch (currentScreen) {
     case ScreenId::Radar:
-      display.drawRadar(settings, aircraft, wifiStatus, gpsStatus, gpsCompassStatus, batteryStatus, timeText, lastUpdateText,
-                        alertStatus, airportManager.airports(), airportManager.statusText(), force);
+      display.drawRadar(radarSettings, aircraft, wifiStatus, gpsStatus, gpsCompassStatus, batteryStatus, timeText,
+                        lastUpdateText, alertStatus, airportManager.airports(), airportManager.statusText(), force);
       break;
     case ScreenId::AircraftList:
-      display.drawAircraftList(settings, aircraft, force);
+      display.drawAircraftList(radarSettings, aircraft, lastUpdateText, force);
       break;
     case ScreenId::AirportList:
       display.drawAirportList(settings, airportManager.airports(), force);
       break;
     case ScreenId::Detail:
-      display.drawAircraftDetail(settings, selectedAircraft(), force);
+      display.drawAircraftDetail(radarSettings, selectedAircraft(), force);
       break;
     case ScreenId::AirportDetail:
-      display.drawAirportDetail(settings, selectedAirport(), force);
+      display.drawAirportDetail(radarSettings, selectedAirport(), aircraft, force);
       break;
     case ScreenId::Settings:
-      display.drawSettings(settings, force);
+      display.drawSettings(settings, wifiStatus, force);
+      break;
+    case ScreenId::WiFiSettings:
+      display.drawWiFiSettings(settings, wifiExt, force);
       break;
     case ScreenId::TouchCalibration:
       display.drawTouchCalibration(settings, calibrationStep, false);
       break;
   }
+}
+
+void startTouchCalibration(bool startupMode) {
+  startupCalibrationMode = startupMode;
+  currentScreen = ScreenId::TouchCalibration;
+  calibrationStep = 0;
+  calibrationWaitingForRelease = false;
+  display.drawTouchCalibration(settings, calibrationStep, false);
+  Serial.printf("[touch-cal] calibration started%s\n", startupMode ? " at first boot" : "");
+}
+
+void continueStartupAfterCalibration() {
+  startWiFi();
+  refreshAdsbIfDue(true);
+  currentScreen = ScreenId::Radar;
+  drawCurrentScreen(true);
 }
 
 void setup() {
@@ -586,20 +898,24 @@ void setup() {
 
   settingsStore.begin();
   settings = settingsStore.load();
+  wifiExt.begin();
   initializeGpsLog();
   aircraft.reserve(Config::MAX_AIRCRAFT);
 
   display.begin(settings);
   airportManager.begin();
-  airportManager.loadNearby(settings.homeLat, settings.homeLon);
+  airportManager.loadNearby(activeRadarLat(), activeRadarLon());
   touch.begin(settings);
   gps.begin();
   updateBatteryStatus(true);
   display.showSplash();
 
-  startWiFi();
-  refreshAdsbIfDue(true);
-  drawCurrentScreen(true);
+  if (!settings.touchCalibrated) {
+    startTouchCalibration(true);
+    return;
+  }
+
+  continueStartupAfterCalibration();
 }
 
 void loop() {
@@ -616,15 +932,14 @@ void loop() {
   refreshAdsbIfDue();
 
   TouchPoint point = touch.read(settings);
-  UIEvent event = display.handleTouch(point, currentScreen, settings, aircraft, airportManager.airports());
+  AppSettings touchSettings = activeRadarSettings();
+  UIEvent event = display.handleTouch(point, currentScreen, touchSettings, aircraft, airportManager.airports(), wifiExt);
   processResetWiFiHold(event);
   handleUiEvent(event);
-
-  const uint32_t now = millis();
-  if (now - lastClockMs >= Config::UI_CLOCK_MS) {
-    lastClockMs = now;
+  if (event.action != UIAction::None) {
     drawCurrentScreen(true);
-  } else {
-    drawCurrentScreen();
+    return;
   }
+
+  drawCurrentScreen();
 }

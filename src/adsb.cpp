@@ -52,63 +52,125 @@ bool ADSBClient::fetch(float homeLat, float homeLon, uint16_t rangeKm, std::vect
     return false;
   }
 
-  JsonDocument doc;
-  DeserializationError err = deserializeJson(doc, http.getStream());
-  http.end();
-  if (err) {
-    lastError_ = "JSON " + String(err.c_str());
-    Serial.printf("[adsb] parse failed: %s\n", err.c_str());
-    return false;
-  }
+  Stream &stream = http.getStream();
+  bool foundArray = false;
+  bool collectingObject = false;
+  bool inString = false;
+  bool escaped = false;
+  int8_t objectDepth = 0;
+  String objectJson;
+  objectJson.reserve(1024);
+  std::vector<String> seenHexes;
+  seenHexes.reserve(Config::MAX_AIRCRAFT);
+  size_t parsed = 0;
+  const uint32_t startMs = millis();
+  uint32_t lastByteMs = startMs;
 
-  JsonArray array;
-  if (doc["aircraft"].is<JsonArray>()) {
-    array = doc["aircraft"].as<JsonArray>();
-  } else if (doc["ac"].is<JsonArray>()) {
-    array = doc["ac"].as<JsonArray>();
-  } else {
+  while (millis() - startMs < 6500 && parsed < Config::MAX_AIRCRAFT) {
+    if (!stream.available()) {
+      if (foundArray && millis() - lastByteMs > 900) break;
+      delay(1);
+      continue;
+    }
+
+    const char c = (char)stream.read();
+    lastByteMs = millis();
+
+    if (!foundArray) {
+      if (c == '[') foundArray = true;
+      continue;
+    }
+
+    if (!collectingObject) {
+      if (c == '{') {
+        collectingObject = true;
+        inString = false;
+        escaped = false;
+        objectDepth = 1;
+        objectJson = "{";
+      } else if (c == ']') {
+        break;
+      }
+      continue;
+    }
+
+    objectJson += c;
+    if (objectJson.length() > 2200) {
+      Serial.println("[adsb] aircraft object too large; skipping object");
+      collectingObject = false;
+      objectDepth = 0;
+      objectJson = "";
+      continue;
+    }
+
+    if (escaped) {
+      escaped = false;
+    } else if (c == '\\' && inString) {
+      escaped = true;
+    } else if (c == '"') {
+      inString = !inString;
+    } else if (!inString) {
+      if (c == '{') {
+        objectDepth++;
+      } else if (c == '}') {
+        objectDepth--;
+        if (objectDepth == 0) {
+          parseAircraftObject(objectJson, aircraft, seenHexes, parsed);
+          collectingObject = false;
+          objectJson = "";
+        }
+      }
+    }
+  }
+  http.end();
+
+  if (!foundArray) {
     lastError_ = "No aircraft array";
     Serial.println("[adsb] no aircraft array in response");
     aircraft.clear();
     return true;
   }
 
-  std::vector<String> seenHexes;
-  seenHexes.reserve(min((size_t)array.size(), Config::MAX_AIRCRAFT));
-  size_t parsed = 0;
-
-  for (JsonObject obj : array) {
-    if (parsed >= Config::MAX_AIRCRAFT) break;
-    Aircraft incoming;
-    incoming.hex = obj["hex"] | "";
-    incoming.hex.toUpperCase();
-    if (incoming.hex.isEmpty()) continue;
-
-    incoming.flight = cleanFlight(obj["flight"] | "");
-    incoming.type = cleanFlight(obj["t"] | "");
-    if (incoming.type.isEmpty()) incoming.type = cleanFlight(obj["type"] | "");
-    incoming.type.toUpperCase();
-    incoming.lat = obj["lat"].is<float>() ? obj["lat"].as<float>() : NAN;
-    incoming.lon = obj["lon"].is<float>() ? obj["lon"].as<float>() : NAN;
-    incoming.altBaro = obj["alt_baro"].is<int>() ? obj["alt_baro"].as<int>() : INT32_MIN;
-    incoming.groundSpeed = obj["gs"].is<float>() ? obj["gs"].as<float>() : NAN;
-    incoming.track = obj["track"].is<float>() ? obj["track"].as<float>() : NAN;
-    incoming.seen = obj["seen"].is<float>() ? obj["seen"].as<float>() : NAN;
-    incoming.category = obj["category"] | "";
-    incoming.updatedAtMs = millis();
-
-    mergeAircraft(aircraft, incoming);
-    seenHexes.push_back(incoming.hex);
-    parsed++;
-  }
-
   aircraft.erase(std::remove_if(aircraft.begin(), aircraft.end(), [&](const Aircraft &a) {
-                   const bool inResponse = std::find(seenHexes.begin(), seenHexes.end(), a.hex) != seenHexes.end();
-                   return !inResponse && millis() - a.updatedAtMs > 30000;
+                   return std::find(seenHexes.begin(), seenHexes.end(), a.hex) == seenHexes.end();
                  }),
                  aircraft.end());
 
   Serial.printf("[adsb] parsed=%u active=%u\n", (unsigned)parsed, (unsigned)aircraft.size());
+  return true;
+}
+
+bool ADSBClient::parseAircraftObject(const String &json, std::vector<Aircraft> &aircraft, std::vector<String> &seenHexes,
+                                     size_t &parsed) {
+  JsonDocument doc;
+  DeserializationError err = deserializeJson(doc, json);
+  if (err) {
+    Serial.printf("[adsb] aircraft parse skipped: %s\n", err.c_str());
+    return false;
+  }
+
+  JsonObject obj = doc.as<JsonObject>();
+  Aircraft incoming;
+  incoming.hex = obj["hex"] | "";
+  incoming.hex.toUpperCase();
+  if (incoming.hex.isEmpty()) return false;
+
+  incoming.flight = cleanFlight(obj["flight"] | "");
+  incoming.type = cleanFlight(obj["t"] | "");
+  if (incoming.type.isEmpty()) incoming.type = cleanFlight(obj["type"] | "");
+  incoming.type.toUpperCase();
+  incoming.lat = obj["lat"].is<float>() ? obj["lat"].as<float>() : NAN;
+  incoming.lon = obj["lon"].is<float>() ? obj["lon"].as<float>() : NAN;
+  incoming.altBaro = obj["alt_baro"].is<int>() ? obj["alt_baro"].as<int>() : INT32_MIN;
+  incoming.groundSpeed = obj["gs"].is<float>() ? obj["gs"].as<float>() : NAN;
+  incoming.track = obj["track"].is<float>() ? obj["track"].as<float>() : NAN;
+  incoming.seen = obj["seen"].is<float>() ? obj["seen"].as<float>() : NAN;
+  incoming.category = obj["category"] | "";
+  incoming.updatedAtMs = millis();
+
+  mergeAircraft(aircraft, incoming);
+  seenHexes.push_back(incoming.hex);
+  parsed++;
   return true;
 }
 
