@@ -24,7 +24,6 @@ class AirportManager {
   bool refreshIfDue(double homeLat, double homeLon, bool force = false);
   const std::vector<Airport> &airports() const { return airports_; }
   const Airport *findByCode(const String &code) const;
-  bool findInDatabaseByCode(const String &code, Airport &airport) const;
   String statusText() const;
   bool hasWarning() const { return warning_.length() > 0; }
   const String &warning() const { return warning_; }
