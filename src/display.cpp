@@ -233,17 +233,17 @@ void DisplayUI::drawAircraftIcon(int16_t x, int16_t y, float heading, uint16_t c
     drawLocalLine(ax + ox, ay + oy, bx + ox, by + oy, color);
   };
 
-  drawLocalLine(0, -11, 0, 9, outlineColor, 1, 1);
-  drawLocalLine(-10, -1, 10, -1, outlineColor, 1, 1);
-  drawLocalLine(-5, 7, 5, 7, outlineColor, 1, 1);
+  drawLocalLine(0, -9, 0, 8, outlineColor, 1, 1);
+  drawLocalLine(-8, -1, 8, -1, outlineColor, 1, 1);
+  drawLocalLine(-4, 6, 4, 6, outlineColor, 1, 1);
 
-  tft_.fillTriangle(tx(0, -13), ty(0, -13), tx(-3, -8), ty(-3, -8), tx(3, -8), ty(3, -8), color);
-  colorLine(0, -11, 0, 9);
-  colorLine(-10, -1, 10, -1);
-  colorLine(-5, 7, 5, 7);
+  tft_.fillTriangle(tx(0, -11), ty(0, -11), tx(-3, -7), ty(-3, -7), tx(3, -7), ty(3, -7), color);
+  colorLine(0, -9, 0, 8);
+  colorLine(-8, -1, 8, -1);
+  colorLine(-4, 6, 4, 6);
   if (selected) {
-    tft_.drawCircle(x, y, 12, outlineColor);
-    tft_.drawCircle(x, y, 13, outlineColor);
+    tft_.drawCircle(x, y, 10, outlineColor);
+    tft_.drawCircle(x, y, 11, outlineColor);
   }
 }
 
@@ -363,6 +363,11 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
     }
   }
 
+  std::vector<uint16_t> labelOrder;
+  if (aircraft.size() > 14) {
+    labelOrder = Radar::nearestOrder(aircraft, settings.homeLat, settings.homeLon, min((size_t)10, aircraft.size()));
+  }
+
   for (const Aircraft &a : aircraft) {
     RadarPoint p = Radar::project(settings.homeLat, settings.homeLon, a.lat, a.lon, settings.rangeKm, cx, cy, radius);
     if (!p.visible) {
@@ -372,8 +377,18 @@ void DisplayUI::drawRadar(const AppSettings &settings, const std::vector<Aircraf
       continue;
     }
     drawAircraftIcon(p.x, p.y, a.track, altitudeColor(a.altBaro), aircraftOutline, selectedHex_ == a.hex);
-    const int16_t labelX = p.x < cx ? p.x + 10 : p.x - 58;
-    const int16_t labelY = p.y - 16;
+    bool showLabel = aircraft.size() <= 14 || selectedHex_ == a.hex;
+    if (!showLabel) {
+      for (uint16_t idx : labelOrder) {
+        if (idx < aircraft.size() && aircraft[idx].hex == a.hex) {
+          showLabel = true;
+          break;
+        }
+      }
+    }
+    if (!showLabel) continue;
+    const int16_t labelX = p.x < cx ? min((int16_t)(p.x + 9), (int16_t)(tft_.width() - 62)) : max((int16_t)2, (int16_t)(p.x - 52));
+    const int16_t labelY = p.y < cy ? p.y + 8 : p.y - 28;
     tft_.setTextFont(1);
     tft_.setTextColor(altitudeColor(a.altBaro), scopeBg);
     tft_.drawString(safeFlight(a), labelX, labelY);
