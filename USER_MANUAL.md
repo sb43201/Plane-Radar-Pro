@@ -366,6 +366,7 @@ Settings screen:
 | Cal Touch | Start four-point touchscreen calibration |
 | Log On / Log Off | Toggle GPS location logging |
 | Center | Cycle radar center source: Manual, GPS, or APT |
+| WiFi On / WiFi Off | Fully enable or disable the ESP32 WiFi radio |
 | WiFi | Open multi-network WiFi Settings |
 | Reset / Reset WiFi | Hold 3 seconds to reset WiFi |
 | Save | Save manual settings |
@@ -381,6 +382,10 @@ Radar center modes:
 Tapping an airport and choosing `Center Radar Here` switches to APT center mode. This does not overwrite the saved manual latitude/longitude shown on the Setup page. To switch back, open `Setup` and tap `Center` until the desired mode is shown.
 
 To save the current GPS fix as the default Manual home location, set `Center` to `GPS`, wait for a GPS fix, then tap `Save`. Plane Radar Pro copies the current GPS latitude/longitude into the saved Manual home position and switches `Center` back to `Manual`.
+
+GPS quiet mode:
+
+If GPS has trouble getting its first fix, open `Setup` and tap `WiFi On` so it changes to `WiFi Off`. This fully shuts down the ESP32 WiFi radio and can reduce RF noise near the GPS module. ADS-B updates stop while WiFi is off, but the screen, GPS status, battery reading, airport list, and saved data remain usable. Tap `WiFi Off` again to turn WiFi back on; the device will reconnect to saved networks automatically.
 
 ## Touchscreen Calibration
 
@@ -404,6 +409,7 @@ Top bar statuses:
 | WiFi: Connected | Connected to hotspot/router |
 | WiFi: Searching | Trying to connect or reconnect |
 | WiFi: Setup Mode | Captive portal is open |
+| WiFi: Off | WiFi radio is fully disabled from Setup |
 
 If WiFi disconnects while running, the radar screen stays visible, shows `WiFi lost`, and retries every 10 seconds.
 

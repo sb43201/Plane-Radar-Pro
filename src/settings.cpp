@@ -23,6 +23,7 @@ AppSettings SettingsStore::load() {
   s.gpsLogging = prefs_.getBool("gpsLog", false);
   s.scopeMode = prefs_.getBool("scope", true);
   s.airportOverlay = prefs_.getBool("aptOv", true);
+  s.wifiRadioEnabled = prefs_.getBool("wifiOn", true);
   s.airportLabelKm = prefs_.getUShort("aptLbl", 50);
   s.adsbRefreshSec = prefs_.getUShort("adsbSec", 5);
 
@@ -78,6 +79,7 @@ void SettingsStore::save(const AppSettings &s) {
   prefs_.putBool("gpsLog", s.gpsLogging);
   prefs_.putBool("scope", s.scopeMode);
   prefs_.putBool("aptOv", s.airportOverlay);
+  prefs_.putBool("wifiOn", s.wifiRadioEnabled);
   prefs_.putUShort("aptLbl", s.airportLabelKm);
   prefs_.putUShort("adsbSec", s.adsbRefreshSec);
 }

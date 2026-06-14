@@ -37,6 +37,7 @@ enum class UIAction : uint8_t {
   ToggleGpsLogging,
   ToggleRadarMode,
   ToggleAirportOverlay,
+  ToggleWiFiRadio,
   AirportLabelNext,
   RefreshRateNext,
   CenterModeNext,

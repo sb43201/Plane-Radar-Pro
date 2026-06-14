@@ -29,6 +29,7 @@ struct AppSettings {
   bool gpsLogging = false;
   bool scopeMode = true;
   bool airportOverlay = true;
+  bool wifiRadioEnabled = true;
   uint16_t airportLabelKm = 50;
   uint16_t adsbRefreshSec = 5;
 };

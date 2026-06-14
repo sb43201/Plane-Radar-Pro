@@ -22,6 +22,7 @@ Hotspot tips:
 - If your phone cannot broadcast its hotspot while connected to `PlaneRadar-Setup`, use a second phone/laptop to open the setup portal.
 - Plane Radar Pro supports up to 10 saved WiFi networks. Use `Setup > WiFi` to add networks, delete networks, enable/disable them, move priority up/down, or export/import `/wifi_config.json` from SD.
 - To switch between home WiFi and phone hotspot without touching settings, save both networks and keep both enabled. The ESP32 will connect to the best available saved network by priority.
+- If GPS needs help getting an initial fix, use `Setup > WiFi On/Off` to fully disable the ESP32 WiFi radio. ADS-B updates pause while WiFi is off, and saved networks reconnect when WiFi is turned back on.
 
 ## Hardware
 

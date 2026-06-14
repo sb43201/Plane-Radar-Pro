@@ -164,6 +164,25 @@ void configureTimeIfNeeded() {
   Serial.println("[time] NTP configured");
 }
 
+void turnWiFiRadioOff() {
+  WiFi.disconnect(false, false);
+  WiFi.mode(WIFI_OFF);
+  wifiStatus = "Off";
+  lastUpdateText = "WiFi radio off";
+  lastAdsbMs = millis();
+  Serial.println("[wifi] radio off for GPS quiet mode");
+  invalidateForBackgroundUpdate();
+}
+
+void turnWiFiRadioOn() {
+  WiFi.mode(WIFI_STA);
+  wifiStatus = "Searching";
+  lastReconnectMs = 0;
+  lastAdsbMs = 0;
+  Serial.println("[wifi] radio on");
+  invalidateForBackgroundUpdate();
+}
+
 void updateBatteryStatus(bool force = false) {
   const uint32_t now = millis();
   if (!force && now - lastBatteryMs < Config::BATTERY_REFRESH_MS) return;
@@ -328,6 +347,10 @@ void applyPortalCenterSettings(const char *airportText, const char *latText, con
 }
 
 void startWiFi() {
+  if (!settings.wifiRadioEnabled) {
+    turnWiFiRadioOff();
+    return;
+  }
   WiFi.mode(WIFI_STA);
   WiFiManager wm;
   wm.setDebugOutput(true);
@@ -388,6 +411,11 @@ void startWiFi() {
 }
 
 void maintainWiFi() {
+  if (!settings.wifiRadioEnabled) {
+    if (WiFi.getMode() != WIFI_OFF || wifiStatus != "Off") turnWiFiRadioOff();
+    return;
+  }
+  if (WiFi.getMode() == WIFI_OFF) turnWiFiRadioOn();
   if (WiFi.status() == WL_CONNECTED) {
     String newStatus = connectedWifiLabel();
     if (newStatus != wifiStatus) {
@@ -414,6 +442,12 @@ void refreshAdsbIfDue(bool force = false) {
   const uint32_t now = millis();
   if (!force && now - lastAdsbMs < (uint32_t)settings.adsbRefreshSec * 1000UL) return;
   lastAdsbMs = now;
+
+  if (!settings.wifiRadioEnabled) {
+    lastUpdateText = "WiFi radio off";
+    invalidateForBackgroundUpdate();
+    return;
+  }
 
   if (WiFi.status() != WL_CONNECTED) {
     lastUpdateText = "WiFi lost";
@@ -522,6 +556,11 @@ void cycleRange() {
 }
 
 void startAddNetworkPortal() {
+  if (!settings.wifiRadioEnabled) {
+    settings.wifiRadioEnabled = true;
+    settingsStore.save(settings);
+    turnWiFiRadioOn();
+  }
   wifiStatus = "Setup Mode";
   display.drawWiFiSetup(settings, "", "Add WiFi Network");
   WiFiManager wm;
@@ -630,6 +669,17 @@ void handleUiEvent(const UIEvent &event) {
       settings.airportOverlay = !settings.airportOverlay;
       settingsStore.save(settings);
       Serial.printf("[settings] airportOverlay=%s\n", settings.airportOverlay ? "true" : "false");
+      break;
+    case UIAction::ToggleWiFiRadio:
+      settings.wifiRadioEnabled = !settings.wifiRadioEnabled;
+      settingsStore.save(settings);
+      if (settings.wifiRadioEnabled) {
+        turnWiFiRadioOn();
+        lastUpdateText = "WiFi radio on";
+      } else {
+        turnWiFiRadioOff();
+      }
+      Serial.printf("[settings] wifiRadio=%s\n", settings.wifiRadioEnabled ? "on" : "off");
       break;
     case UIAction::AirportLabelNext: {
       size_t index = 0;

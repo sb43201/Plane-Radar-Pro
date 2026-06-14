@@ -76,6 +76,8 @@ const char *uiActionName(UIAction action) {
       return "ToggleRadarMode";
     case UIAction::ToggleAirportOverlay:
       return "ToggleAirportOverlay";
+    case UIAction::ToggleWiFiRadio:
+      return "ToggleWiFiRadio";
     case UIAction::AirportLabelNext:
       return "AirportLabelNext";
     case UIAction::RefreshRateNext:
@@ -787,10 +789,15 @@ void DisplayUI::drawSettings(const AppSettings &settings, const String &wifiStat
   button(110, 282, 86, 28, centerLabel, settingsPanel, settingsText);
   button(206, 282, 100, 28, String(settings.adsbRefreshSec) + " sec", settingsAccent, TFT_WHITE);
 
-  button(10, 334, 72, 30, "Reset", TFT_RED, TFT_WHITE);
-  button(88, 334, 68, 30, "WiFi", settingsPanel, settingsText);
-  button(162, 334, 74, 30, "Reboot", settingsPanel, settingsText);
-  button(242, 334, 68, 30, "Save", TFT_GREEN, TFT_BLACK);
+  settingsTextMode();
+  tft_.drawString("WiFi Radio", 16, 328);
+  button(110, 322, 86, 28, settings.wifiRadioEnabled ? "WiFi On" : "WiFi Off",
+         settings.wifiRadioEnabled ? settingsAccent : settingsPanel, settings.wifiRadioEnabled ? TFT_WHITE : settingsText);
+
+  button(10, 374, 72, 30, "Reset", TFT_RED, TFT_WHITE);
+  button(88, 374, 68, 30, "WiFi", settingsPanel, settingsText);
+  button(162, 374, 74, 30, "Reboot", settingsPanel, settingsText);
+  button(242, 374, 68, 30, "Save", TFT_GREEN, TFT_BLACK);
   drawBottomNav(settings, ScreenId::Settings);
 }
 
@@ -1058,10 +1065,11 @@ UIEvent DisplayUI::handleTouch(const TouchPoint &point, ScreenId screen, const A
     else if (inTouchRect(point.x, point.y, 206, 242, 100, 28)) event.action = UIAction::AirportLabelNext;
     else if (inTouchRect(point.x, point.y, 110, 282, 86, 28)) event.action = UIAction::CenterModeNext;
     else if (inTouchRect(point.x, point.y, 206, 282, 100, 28)) event.action = UIAction::RefreshRateNext;
-    else if (inTouchRect(point.x, point.y, 10, 334, 72, 30, 6)) event.action = UIAction::ResetWiFiHold;
-    else if (inTouchRect(point.x, point.y, 88, 334, 68, 30, 6)) event.action = UIAction::ShowWiFiSettings;
-    else if (inTouchRect(point.x, point.y, 162, 334, 74, 30, 6)) event.action = UIAction::RebootDevice;
-    else if (inTouchRect(point.x, point.y, 242, 334, 68, 30, 6)) event.action = UIAction::SaveSettings;
+    else if (inTouchRect(point.x, point.y, 110, 322, 86, 28)) event.action = UIAction::ToggleWiFiRadio;
+    else if (inTouchRect(point.x, point.y, 10, 374, 72, 30, 6)) event.action = UIAction::ResetWiFiHold;
+    else if (inTouchRect(point.x, point.y, 88, 374, 68, 30, 6)) event.action = UIAction::ShowWiFiSettings;
+    else if (inTouchRect(point.x, point.y, 162, 374, 74, 30, 6)) event.action = UIAction::RebootDevice;
+    else if (inTouchRect(point.x, point.y, 242, 374, 68, 30, 6)) event.action = UIAction::SaveSettings;
     if (event.action != UIAction::None) dirty_ = true;
   }
   return event;
