@@ -181,7 +181,7 @@ Setup flow:
 The captive portal center airport and home latitude/longitude fields are optional. If an airport code is entered, Plane Radar Pro uses that airport as the radar center without overwriting the manual home latitude/longitude. If latitude/longitude are entered instead, Plane Radar Pro switches to Manual center mode. If GPS has a fix, you can select GPS center mode later from `Setup`.
 10. The ESP32 saves credentials and restarts into radar mode.
 
-Future boots try saved networks by priority, using up to 30 seconds per attempt, before opening setup mode.
+Future boots try saved networks by priority, using up to 30 seconds per attempt, before opening setup mode. If no WiFi is available and nobody completes setup, the setup portal closes after about 2 minutes and Plane Radar Pro continues to the radar screen offline. You can reopen setup later from `Setup > WiFi > Add`.
 
 Phone hotspot notes:
 
@@ -204,7 +204,7 @@ Plane Radar Pro supports up to 10 saved WiFi networks. Each saved network has:
 - Priority order
 - Enabled/disabled state
 
-At boot, Plane Radar Pro loads the saved network list, sorts it by priority, and tries enabled networks in order. It tries each network for up to 30 seconds and retries before moving to the next one. If none connect, it opens the `PlaneRadar-Setup` captive portal.
+At boot, Plane Radar Pro loads the saved network list, sorts it by priority, and tries enabled networks in order. It tries each network for up to 30 seconds and retries before moving to the next one. If none connect, it opens the `PlaneRadar-Setup` captive portal. If the portal is not used within about 2 minutes, the device continues offline and keeps the UI usable.
 
 Best no-reset method:
 

@@ -333,6 +333,7 @@ void startWiFi() {
   wm.setDebugOutput(true);
   wm.setConnectTimeout(30);
   wm.setConnectRetries(2);
+  wm.setConfigPortalTimeout(Config::WIFI_SETUP_PORTAL_TIMEOUT_SEC);
   wm.setBreakAfterConfig(true);
   wm.setSaveConfigCallback(markWifiPortalSaved);
   char portalAirport[12] = "";
@@ -377,6 +378,11 @@ void startWiFi() {
     Serial.println("[wifi] portal saved credentials; rebooting into radar mode");
     delay(500);
     ESP.restart();
+  }
+  if (!ok) {
+    wifiStatus = "No WiFi";
+    lastUpdateText = "WiFi setup timed out";
+    Serial.println("[wifi] setup portal timed out; continuing offline");
   }
   configureTimeIfNeeded();
 }
@@ -522,6 +528,7 @@ void startAddNetworkPortal() {
   wm.setDebugOutput(true);
   wm.setConnectTimeout(30);
   wm.setConnectRetries(2);
+  wm.setConfigPortalTimeout(Config::WIFI_SETUP_PORTAL_TIMEOUT_SEC);
   wm.setBreakAfterConfig(true);
   wm.setSaveConfigCallback(markWifiPortalSaved);
   char portalAirport[12] = "";
