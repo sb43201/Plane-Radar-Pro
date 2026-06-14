@@ -805,7 +805,7 @@ void DisplayUI::drawWiFiSettings(const AppSettings &settings, const WiFiManagerE
   if (!dirty_ && !force) return;
   dirty_ = false;
   tft_.fillScreen(bg(settings));
-  header(settings, "WiFi Settings", wifi.statusText());
+  header(settings, "WiFi Settings", settings.wifiRadioEnabled ? wifi.statusText() : "Radio Off");
 
   const auto &networks = wifi.networks();
   if (networks.empty()) {

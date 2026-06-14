@@ -183,6 +183,17 @@ void turnWiFiRadioOn() {
   invalidateForBackgroundUpdate();
 }
 
+void prepareWiFiSetupPortalRadio() {
+  WiFi.mode(WIFI_OFF);
+  delay(80);
+  WiFi.persistent(false);
+  WiFi.disconnect(false, false);
+  WiFi.softAPdisconnect(true);
+  WiFi.mode(WIFI_AP_STA);
+  delay(150);
+  Serial.println("[wifi] radio prepared for setup portal");
+}
+
 void updateBatteryStatus(bool force = false) {
   const uint32_t now = millis();
   if (!force && now - lastBatteryMs < Config::BATTERY_REFRESH_MS) return;
@@ -388,6 +399,7 @@ void startWiFi() {
   display.drawWiFiSetup(settings, savedSsid, "WiFi: Setup Mode");
   Serial.println("[wifi] starting WiFiManager setup portal");
   wifiPortalSaved = false;
+  prepareWiFiSetupPortalRadio();
   bool ok = wm.autoConnect(Config::WIFI_AP_NAME);
   wifiStatus = ok ? connectedWifiLabel() : "Searching";
   Serial.printf("[wifi] %s ssid=%s ip=%s\n", ok ? "connected" : "not connected", WiFi.SSID().c_str(),
@@ -563,6 +575,7 @@ void startAddNetworkPortal() {
   }
   wifiStatus = "Setup Mode";
   display.drawWiFiSetup(settings, "", "Add WiFi Network");
+  prepareWiFiSetupPortalRadio();
   WiFiManager wm;
   wm.setDebugOutput(true);
   wm.setConnectTimeout(30);
@@ -873,6 +886,8 @@ void resetWiFiAndRestart() {
   WiFiManager wm;
   wm.resetSettings();
   wifiExt.clear();
+  settings.wifiRadioEnabled = true;
+  settingsStore.save(settings);
   WiFi.disconnect(true, true);
   delay(500);
   ESP.restart();
