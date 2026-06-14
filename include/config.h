@@ -68,6 +68,7 @@ constexpr uint16_t ADSB_REFRESH_OPTIONS_SEC[] = {5, 10, 15, 30};
 constexpr size_t ADSB_REFRESH_OPTION_COUNT = sizeof(ADSB_REFRESH_OPTIONS_SEC) / sizeof(ADSB_REFRESH_OPTIONS_SEC[0]);
 constexpr uint32_t WIFI_RECONNECT_MS = 10000;
 constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 60000;
+constexpr uint16_t WIFI_SETUP_PORTAL_TIMEOUT_SEC = 120;
 constexpr uint32_t WIFI_RESET_HOLD_MS = 3000;
 constexpr uint32_t UI_CLOCK_MS = 1000;
 constexpr float ALERT_DISTANCE_KM = 2.0f;
