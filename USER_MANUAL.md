@@ -4,11 +4,22 @@ Plane Radar Pro is an ESP32 touchscreen ADS-B radar that uses WiFi and the publi
 
 ## Hardware
 
-Supported target:
+Supported targets:
 
-- ESP32-WROOM-32E 3.5-inch ST7796 touchscreen board
+- Hosyond/LCDWiki ESP32-WROOM-32E 3.5-inch ST7796 touchscreen board, E32R35T touch version
+- Hosyond/LCDWiki ESP32-WROOM-32E 4.0-inch ST7796 touchscreen board, E32R40T touch version
 - XPT2046 resistive touch controller
 - Optional NMEA GPS receiver module such as NEO-6M / GY-GPS6MV2
+
+Reference pages:
+
+- Hosyond product catalog: https://hosyond.com/
+- 3.5-inch ESP32 display: https://www.lcdwiki.com/3.5inch_ESP32-32E_Display
+- 4.0-inch ESP32 display: https://www.lcdwiki.com/4.0inch_ESP32-32E_Display
+
+The Hosyond catalog lists both `3.5 inch ESP32 Display` and `4 inch ESP32 Display` under ESP32 Display. The LCDWiki pages identify the 3.5-inch module family as E32R35T/E32N35T and the 4.0-inch module family as E32R40T/E32N40T. The touch versions use ST7796 SPI LCDs with XPT2046 SPI resistive touch.
+
+The 4.0-inch E32R40T pin assignment matches the firmware pinout below, so the same PlatformIO project can be used on the 3.5-inch and 4.0-inch touch boards. After swapping display sizes, run `Setup > Cal Touch` once because the touch panel active area is physically different.
 
 Board pinout used by this firmware:
 

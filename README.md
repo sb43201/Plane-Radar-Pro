@@ -1,6 +1,6 @@
 # Plane Radar Pro
 
-PlatformIO Arduino firmware for an ESP32-WROOM-32E 3.5-inch ST7796/XPT2046 touchscreen board.
+PlatformIO Arduino firmware for Hosyond/LCDWiki ESP32-WROOM-32E ST7796/XPT2046 touchscreen boards, including the 3.5-inch and 4.0-inch ESP32 display modules.
 
 Plane Radar Pro is an internet ADS-B radar client. It uses WiFi and the public adsb.fi OpenData API; it is not an SDR receiver and does not require an API key.
 
@@ -25,6 +25,19 @@ Hotspot tips:
 - If GPS needs help getting an initial fix, use `Setup > WiFi On/Off` to fully disable the ESP32 WiFi radio. ADS-B updates pause while WiFi is off, and saved networks reconnect when WiFi is turned back on.
 
 ## Hardware
+
+Supported integrated ESP32 display modules:
+
+- Hosyond/LCDWiki `3.5 inch ESP32 Display`: E32R35T touch version, E32N35T non-touch version.
+- Hosyond/LCDWiki `4 inch ESP32 Display`: E32R40T touch version, E32N40T non-touch version.
+
+Reference pages:
+
+- Hosyond product catalog: https://hosyond.com/
+- 3.5-inch tutorial/data page: https://www.lcdwiki.com/3.5inch_ESP32-32E_Display
+- 4.0-inch tutorial/data page: https://www.lcdwiki.com/4.0inch_ESP32-32E_Display
+
+The current firmware target is the touch version of these boards. Both the 3.5-inch and 4.0-inch ESP32-32E display pages specify a 320x480 ST7796 SPI LCD and XPT2046 SPI resistive touch controller. The 4.0-inch E32R40T/E32N40T pin assignment matches the pinout below, so no firmware pin changes are needed when moving from the 3.5-inch board to the 4.0-inch board. Run `Setup > Cal Touch` after changing boards because the touch glass and active area are different.
 
 LCD:
 
